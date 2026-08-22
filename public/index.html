@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SyncPulse — High-Definition Synchronized Spatial Audio Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+  <!-- Atmospheric Layer 1: Underlay (Behind cards - EQ bars, storm mist) -->
+  <canvas id="atmosphere-underlay"></canvas>
+  
+  <!-- Atmospheric Layer 2: Overlay (Above/Over cards - floating snow, rain, hearts, lightning) -->
+  <canvas id="atmosphere-overlay"></canvas>
+
+  <div class="app-wrapper">
+    <!-- Master Header -->
+    <header class="master-header">
+      <div class="brand-wrapper">
+        <div class="brand-emblem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">SyncPulse</h1>
+          <div class="brand-tagline">8D & Dolby Spatial Multi-Device Sound</div>
+        </div>
+      </div>
+
+      <!-- Atmospheric Theme Mood Selector (Snow, Thunder, EQ, Rain, Hearts, Stars, Sparks) -->
+      <div class="atmosphere-picker">
+        <span class="atmo-label">Atmosphere</span>
+        <button class="atmo-btn active" data-theme="snow" title="Drifting Snowflakes & Cold Mood">❄️ Snow</button>
+        <button class="atmo-btn" data-theme="thunder" title="Storm Lightning & Thunder Flashes">⚡ Thunder</button>
+        <button class="atmo-btn" data-theme="equalizer" title="Real-Time Ambient Equalizer Spectrum">📊 EQ Bars</button>
+        <button class="atmo-btn" data-theme="rain" title="Raindrops & Monsoon Mood">🌧️ Rain</button>
+        <button class="atmo-btn" data-theme="hearts" title="Floating Hearts & Romance">💖 Hearts</button>
+        <button class="atmo-btn" data-theme="stars" title="Twinkling Cosmic Stars">✨ Stars</button>
+        <button class="atmo-btn" data-theme="sparks" title="Cyberpunk High-Energy Sparks">🔥 Sparks</button>
+      </div>
+
+      <div class="header-telemetry-cluster">
+        <div id="sync-badge" class="status-pill syncing">
+          <span class="pulse-beacon"></span>
+          <span id="sync-text">Syncing Clock...</span>
+        </div>
+        <span id="rtt-display" style="font-size:0.72rem; font-family:var(--font-mono); color:var(--text-tertiary);">RTT: --ms</span>
+        <div class="room-capsule">
+          <span>ROOM</span>
+          <strong id="room-code-text">------</strong>
+        </div>
+        <button id="btn-share-qr" class="btn-glass-secondary" style="padding: 5px 10px; font-size: 0.75rem; display:flex; align-items:center; gap:5px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Connect Phone
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Dock -->
+    <nav class="nav-dock">
+      <button class="dock-tab active" data-tab="studio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="10 8 16 12 10 16 10 8"></polygon>
+        </svg>
+        Live Studio, 8D & YouTube Desk
+      </button>
+      <button class="dock-tab" data-tab="fleet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        Dolby Fleet Matrix (<span id="device-count-badge">1 Online</span>)
+      </button>
+      <button class="dock-tab" data-tab="calibrator">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"></circle>
+          <line x1="12" y1="3" x2="12" y2="7"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        Latency & Bluetooth Calibrator
+      </button>
+    </nav>
+
+    <!-- Panel 1: Live Studio, 8D & YouTube -->
+    <main id="panel-studio" class="tab-panel active">
+      <div class="studio-trio-grid">
+        <!-- 3D Visualizer Viewport -->
+        <section class="visualizer-viewport">
+          <div class="visualizer-hud">
+            <div class="hud-pill">
+              <span class="pulse-beacon" style="background:var(--neon-cyan);"></span>
+              <span>60 FPS • WebGL DSP</span>
+            </div>
+            <!-- 3D Mode Selector -->
+            <div class="vis-mode-switch">
+              <button class="vis-btn-mini active" data-vis-mode="sphere">Quantum</button>
+              <button class="vis-btn-mini" data-vis-mode="tunnel">Tunnel</button>
+              <button class="vis-btn-mini" data-vis-mode="bars">Towers</button>
+            </div>
+          </div>
+          <div class="viewport-canvas-box">
+            <canvas id="visualizer-canvas"></canvas>
+          </div>
+        </section>
+
+        <!-- Master Studio Console -->
+        <section class="control-console">
+          <!-- Top Track Billboard -->
+          <div class="track-billboard">
+            <div class="vinyl-casing">
+              <div id="vinyl-disc" class="vinyl-disc">
+                <div class="vinyl-grooves"></div>
+                <div class="vinyl-label">
+                  <div class="vinyl-center-hole"></div>
+                </div>
+              </div>
+            </div>
+            <div class="track-headlines">
+              <div id="track-title" class="track-main-title">Neon Cyberpunk Bassline</div>
+              <div class="track-artist-sub">
+                <span id="track-artist">SyncPulse Studio</span>
+                <span class="track-badge">
+                  <span class="pulse-beacon" style="width:5px; height:5px; background:var(--neon-cyan);"></span>
+                  SYNCED STREAM
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Spatial Acoustic Engine Mode Selector -->
+          <div class="spatial-mode-box">
+            <div class="spatial-mode-header">
+              <span>Spatial Acoustic Engine</span>
+            </div>
+            <div class="spatial-mode-trio">
+              <button class="mode-btn active" data-mode="normal">Stereo ◀▶</button>
+              <button class="mode-btn" data-mode="8d">8D Audio 🎧</button>
+              <button class="mode-btn" data-mode="dolby">Dolby 5.1 🔊</button>
+            </div>
+          </div>
+
+          <!-- Stereo VU Decibel Meters -->
+          <div class="vu-cluster">
+            <div class="vu-header-labels">
+              <span>L VU METER</span>
+              <span id="vu-db-readout">-14 dB</span>
+              <span>R VU METER</span>
+            </div>
+            <div class="vu-meter-rack">
+              <div class="vu-channel">
+                <div id="vu-bar-left" class="vu-bar"></div>
+              </div>
+              <div class="vu-channel">
+                <div id="vu-bar-right" class="vu-bar"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Playback Progress Scrubber -->
+          <div class="playback-scrub-box">
+            <div id="progress-bar" class="scrub-track">
+              <div id="progress-fill" class="scrub-fill">
+                <div class="scrub-handle"></div>
+              </div>
+            </div>
+            <div class="scrub-timestamps">
+              <span id="time-current">0:00</span>
+              <span id="time-total">0:30</span>
+            </div>
+          </div>
+
+          <!-- Master Transport Hardware Controls -->
+          <div class="transport-core">
+            <button id="btn-prev-track" class="btn-tactile-sm" title="Previous Track">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line>
+              </svg>
+            </button>
+            <button id="btn-stop" class="btn-tactile-sm" title="Stop & Rewind">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              </svg>
+            </button>
+            <button id="btn-play" class="btn-tactile master-trigger" title="Play / Pause Cue">
+              <svg id="play-icon" viewBox="0 0 24 24">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <svg id="pause-icon" viewBox="0 0 24 24" style="display: none;">
+                <rect x="6" y="4" width="4" height="16" rx="1.5"></rect>
+                <rect x="14" y="4" width="4" height="16" rx="1.5"></rect>
+              </svg>
+            </button>
+            <button id="btn-next-track" class="btn-tactile-sm" title="Next Track">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line>
+              </svg>
+            </button>
+            <button id="btn-loop-toggle" class="btn-tactile-sm" title="Repeat Track">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="17 1 21 5 17 9"></polyline>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                <polyline points="7 23 3 19 7 15"></polyline>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Master Volume & Sound Level -->
+          <div class="volume-bar-box">
+            <button id="btn-mute-toggle" class="btn-volume-icon" title="Mute / Unmute">
+              <svg id="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              </svg>
+            </button>
+            <input type="range" id="volume-slider" class="custom-range" min="0" max="1" step="0.01" value="0.85">
+            <span id="vol-percent" class="vol-percent-badge">85%</span>
+          </div>
+        </section>
+
+        <!-- Column 3: Mini YouTube Search & Sync Desk -->
+        <section class="mini-youtube-panel">
+          <div class="yt-header">
+            <div class="yt-badge">
+              <svg class="yt-icon-svg" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+              <span>Mini YouTube</span>
+            </div>
+            <label class="yt-autoplay-toggle">
+              <input type="checkbox" id="yt-autoplay-checkbox" checked>
+              <span>Autoplay</span>
+            </label>
+          </div>
+
+          <!-- YouTube Search / URL Bar -->
+          <div class="yt-search-form">
+            <input type="text" id="yt-search-input" class="yt-search-input" placeholder="Search song or paste YouTube link...">
+            <button id="btn-yt-search" class="btn-yt-search">Go</button>
+          </div>
+
+          <!-- Video Results List -->
+          <div id="yt-results-scroll" class="yt-results-scroll"></div>
+        </section>
+      </div>
+
+      <!-- Offline & Custom Tracks Library Shelf -->
+      <section style="background:var(--bg-card); backdrop-filter:blur(24px); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; display:flex; flex-direction:column; gap:12px; margin-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="font-family:var(--font-display); font-size:0.95rem; font-weight:700; color:#fff;">Offline Audio Files & Local Presets</div>
+            <div style="font-size:0.72rem; color:var(--text-tertiary);">Play offline files across all phones without needing external internet.</div>
+          </div>
+          <div>
+            <input type="file" id="audio-upload-input" accept="audio/*" style="display:none;">
+            <button id="btn-upload-trigger" class="btn-solid-primary" style="padding:6px 14px; font-size:0.78rem;">
+              📁 Load Offline Song (MP3/WAV)
+            </button>
+          </div>
+        </div>
+        <div id="track-list-container" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:8px;"></div>
+      </section>
+    </main>
+
+    <!-- Panel 2: Dolby Fleet Matrix -->
+    <section id="panel-fleet" class="tab-panel">
+      <div style="background:var(--bg-card); backdrop-filter:blur(24px); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:700; color:#fff;">Connected Dolby Audio Nodes</h2>
+          <p style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Assign each phone as Front, Center, Rear, or Subwoofer (with mobile haptic bass vibration!).</p>
+        </div>
+        <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="font-size:0.8rem; padding:8px 16px;">+ Connect Phone</button>
+      </div>
+
+      <div id="fleet-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;"></div>
+    </section>
+
+    <!-- Panel 3: Latency Calibrator -->
+    <section id="panel-calibrator" class="tab-panel">
+      <div class="calibrator-workbench" style="background:var(--bg-card); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:24px; display:flex; flex-direction:column; gap:20px;">
+        <div>
+          <h2 style="font-family:var(--font-display); font-size:1.2rem; font-weight:700; color:#fff;">Hardware & Bluetooth Latency Calibrator</h2>
+          <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:4px;">
+            Bluetooth headphones and DACs introduce a 50–200ms codec buffer delay. 
+            Adjust your offset until the audio click matches the strobe circle flash.
+          </p>
+        </div>
+
+        <div class="strobe-visual-arena" style="position:relative; height:180px; background:radial-gradient(circle at center, rgba(0,242,254,0.08) 0%, #030509 85%); border:1px solid var(--border-medium); border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <div class="strobe-crosshair-h" style="position:absolute; width:100%; height:1px; background:linear-gradient(90deg, transparent, rgba(0,242,254,0.3), transparent);"></div>
+          <div class="strobe-crosshair-v" style="position:absolute; height:100%; width:1px; background:linear-gradient(180deg, transparent, rgba(0,242,254,0.3), transparent);"></div>
+          <div id="calibrator-marker" class="target-strobe-orb" style="width:60px; height:60px; border-radius:50%; border:2px solid var(--neon-magenta); display:flex; align-items:center; justify-content:center; position:relative; z-index:2; transition:all 0.06s ease;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:rgba(0,0,0,0.4); border:1px solid var(--border-medium); border-radius:10px;">
+            <div>
+              <div style="font-size:0.68rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:1px; font-weight:700;">Hardware Offset Compensation</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">Fine-tune your device delay in milliseconds.</div>
+            </div>
+            <div id="offset-val-display" style="font-family:var(--font-mono); font-size:1.8rem; font-weight:800; color:var(--neon-cyan);">+0 ms</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-tertiary);">-300ms</span>
+            <input type="range" id="offset-slider" min="-300" max="300" step="1" value="0" style="flex:1; -webkit-appearance:none; height:6px; border-radius:10px; background:rgba(255,255,255,0.1); outline:none;">
+            <span style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-tertiary);">+300ms</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; gap:6px;">
+              <button id="btn-step-down" class="btn-glass-secondary">-5 ms</button>
+              <button id="btn-step-up" class="btn-glass-secondary">+5 ms</button>
+              <button id="btn-reset-offset" class="btn-glass-secondary">Reset (0 ms)</button>
+            </div>
+            <button id="btn-calibrator-toggle" class="btn-glass-secondary">▶ Start Metronome Test</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal: Arm Audio Engine -->
+  <div id="modal-arm" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="brand-emblem" style="width:48px; height:48px; margin:0 auto;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Arm Spatial Audio Engine</div>
+      <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
+        Tap below to activate high-precision hardware audio decoding and lock in synchronization with the master network clock.
+      </p>
+      <button id="btn-arm-audio" class="btn-solid-primary">⚡ Activate & Sync Audio</button>
+    </div>
+  </div>
+
+  <!-- Modal: QR Code Connect -->
+  <div id="modal-qr" class="modal-backdrop">
+    <div class="modal-container">
+      <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Connect Additional Phones</div>
+      <p style="font-size:0.8rem; color:var(--text-secondary);">Scan with your phone's camera on the same Wi-Fi network.</p>
+      <div style="display:flex; justify-content:center; padding:12px; background:#030509; border-radius:10px; border:1px solid var(--border-medium);">
+        <img id="qr-image" alt="QR Code" style="max-width:180px; width:100%; border-radius:6px;">
+      </div>
+      <div style="display:flex; justify-content:center;">
+        <div class="room-capsule" style="font-size:0.95rem; padding:6px 16px;">
+          <span>ROOM PIN:</span>
+          <strong id="qr-room-code" style="font-size:1.2rem;">------</strong>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:center;">
+        <button id="btn-copy-link" class="btn-solid-primary" style="padding:8px 16px; font-size:0.8rem;">📋 Copy Link</button>
+        <button id="btn-close-qr" class="btn-glass-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden YouTube Player Container -->
+  <div id="youtube-player-container"></div>
+
+  <!-- Client Application Scripts -->
+  <script src="/js/atmosphereEngine.js"></script>
+  <script src="/js/syncEngine.js"></script>
+  <script src="/js/audioEngine.js"></script>
+  <script src="/js/latencyCalibrator.js"></script>
+  <script src="/js/visualizer3d.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
