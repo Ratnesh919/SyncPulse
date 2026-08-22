@@ -1,6 +1,7 @@
 # 🎧 SyncPulse — High-Definition Synchronized Spatial Audio Network
 
-**SyncPulse** is a synchronized spatial audio web system engineered to turn multiple smartphones, laptops, and Bluetooth speakers into a cohesive **Dolby 5.1 / 7.1 Surround & 8D Binaural Audio Fleet** with sub-millisecond precision clock synchronization.
+> 🌐 **Live Web Application:** [https://syncpulse-1igt.onrender.com](https://syncpulse-1igt.onrender.com)  
+> 📱 **Connect any phone or laptop via room link/QR code for synchronized 8D & Dolby surround audio!**
 
 ---
 

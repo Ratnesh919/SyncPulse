@@ -15,7 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const roomCodeText = document.getElementById('room-code-text');
   const btnShareQr = document.getElementById('btn-share-qr');
   const atmoButtons = document.querySelectorAll('.atmo-btn');
-  const atmosphereCanvas = document.getElementById('atmosphere-canvas');
+  const atmosphereUnderlay = document.getElementById('atmosphere-underlay');
+  const atmosphereOverlay = document.getElementById('atmosphere-overlay');
+
+  // Device Name Controls
+  const btnEditDevice = document.getElementById('btn-edit-device');
+  const myDeviceLabel = document.getElementById('my-device-label');
+  const modalEditName = document.getElementById('modal-edit-name');
+  const editNameInput = document.getElementById('edit-name-input');
+  const btnSaveDeviceName = document.getElementById('btn-save-device-name');
+  const btnCancelDeviceName = document.getElementById('btn-cancel-device-name');
+  const deviceNameInput = document.getElementById('device-name-input');
+  const joinModalTitle = document.getElementById('join-modal-title');
+  const joinModalDesc = document.getElementById('join-modal-desc');
 
   // Player Elements
   const trackTitle = document.getElementById('track-title');
@@ -90,9 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRoomId = null;
   let myRole = 'host';
   let myPeerId = null;
+  let myDeviceName = localStorage.getItem('syncpulse_device_name') || detectDeviceName();
   let currentTrack = null;
   let tracks = [];
   let currentSpatialMode = 'normal';
+  let pendingPlaybackState = null;
 
   // YouTube Player State
   let ytPlayer = null;
@@ -101,6 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
 
   async function init() {
+    if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
+    if (deviceNameInput) deviceNameInput.value = myDeviceName;
+
     setupAtmosphere();
     setupTabNavigation();
     setupModals();
@@ -114,9 +131,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (roomParam) {
       currentRoomId = roomParam.toUpperCase();
       myRole = 'guest';
+      if (joinModalTitle) joinModalTitle.textContent = `Join Audio Room ${currentRoomId}`;
+      if (joinModalDesc) joinModalDesc.textContent = 'Enter your device name and tap below to activate synchronized spatial sound on this device.';
+      if (btnArmAudio) btnArmAudio.textContent = '⚡ Tap to Join & Sync Audio';
     } else {
       currentRoomId = generateRoomCode();
       myRole = 'host';
+      if (joinModalTitle) joinModalTitle.textContent = 'Host Spatial Audio Room';
+      if (joinModalDesc) joinModalDesc.textContent = 'Name your master device and tap below to start high-precision spatial synchronization.';
+      if (btnArmAudio) btnArmAudio.textContent = '⚡ Start Master Audio Sync';
     }
 
     roomCodeText.textContent = currentRoomId;
@@ -140,14 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Show initial join modal to unlock audio context on mobile & confirm device name
     modalArm.classList.add('active');
   }
 
   function setupAtmosphere() {
-    const underlay = document.getElementById('atmosphere-underlay');
-    const overlay = document.getElementById('atmosphere-overlay');
-    if (underlay || overlay) {
-      atmosphereEngine = new AtmosphereEngine(underlay, overlay, audioEngine);
+    if (atmosphereUnderlay || atmosphereOverlay) {
+      atmosphereEngine = new AtmosphereEngine(atmosphereUnderlay, atmosphereOverlay, audioEngine);
       atmosphereEngine.start();
 
       atmoButtons.forEach(btn => {
@@ -197,15 +219,72 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setupModals() {
+    // Initial Audio Arm & Device Setup
     btnArmAudio.addEventListener('click', async () => {
+      const enteredName = deviceNameInput.value.trim();
+      if (enteredName) {
+        myDeviceName = enteredName;
+        localStorage.setItem('syncpulse_device_name', myDeviceName);
+        if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
+      }
+
       await audioEngine.init();
       modalArm.classList.remove('active');
-      showToast('⚡ Audio Hardware Synchronized & Armed!');
-      if (currentTrack && currentTrack.type === 'audio') {
-        audioEngine.loadTrack(currentTrack.url);
+      showToast(`⚡ Audio Activated as "${myDeviceName}"!`);
+
+      // Update name over WebSocket
+      sendJoinRoomMessage();
+
+      // If there's an ongoing track or pending playback from host, play immediately!
+      if (currentTrack) {
+        if (currentTrack.type === 'youtube') {
+          if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
+            handleYouTubePlayCue(currentTrack.youtubeVideoId, pendingPlaybackState.position);
+          }
+        } else {
+          await audioEngine.loadTrack(currentTrack.url);
+          if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
+            audioEngine.schedulePlayback(
+              pendingPlaybackState.targetMasterTime,
+              syncEngine ? syncEngine.now() : performance.now(),
+              pendingPlaybackState.position
+            );
+            setPlayButtonState(true);
+          }
+        }
       }
     });
 
+    // Rename Device Modal
+    if (btnEditDevice) {
+      btnEditDevice.addEventListener('click', () => {
+        editNameInput.value = myDeviceName;
+        modalEditName.classList.add('active');
+        editNameInput.focus();
+      });
+    }
+
+    if (btnSaveDeviceName) {
+      btnSaveDeviceName.addEventListener('click', () => {
+        const val = editNameInput.value.trim();
+        if (val) {
+          myDeviceName = val;
+          localStorage.setItem('syncpulse_device_name', myDeviceName);
+          if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
+          sendTelemetry();
+          showToast(`📱 Device name changed to: ${myDeviceName}`);
+        }
+        modalEditName.classList.remove('active');
+      });
+    }
+
+    if (btnCancelDeviceName) {
+      btnCancelDeviceName.addEventListener('click', () => {
+        modalEditName.classList.remove('active');
+      });
+    }
+
+    // QR Code Share Modal
     btnShareQr.addEventListener('click', async () => {
       const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
       qrRoomCode.textContent = currentRoomId;
@@ -228,7 +307,6 @@ document.addEventListener('DOMContentLoaded', () => {
       navigator.clipboard.writeText(roomUrl);
       showToast('📋 Room link copied to clipboard!');
     });
-
   }
 
   async function fetchServerInfo() {
@@ -266,15 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       syncEngine.start();
 
-      const deviceName = detectDeviceName();
-      ws.send(JSON.stringify({
-        type: 'join_room',
-        roomId: currentRoomId,
-        role: myRole,
-        deviceName,
-        channel: audioEngine.channelMode,
-        userAgent: navigator.userAgent
-      }));
+      sendJoinRoomMessage();
     };
 
     ws.onmessage = (evt) => {
@@ -294,6 +364,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function sendJoinRoomMessage() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'join_room',
+      roomId: currentRoomId,
+      role: myRole,
+      deviceName: myDeviceName,
+      channel: audioEngine.channelMode,
+      userAgent: navigator.userAgent
+    }));
+  }
+
   function handleServerMessage(msg) {
     switch (msg.type) {
       case 'ntp_pong':
@@ -308,20 +390,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msg.currentTrack) {
           currentTrack = msg.currentTrack;
           updateTrackUi(currentTrack);
-          if (audioEngine.ctx && currentTrack.type === 'audio') {
-            audioEngine.loadTrack(currentTrack.url);
-          }
         }
-        if (msg.playbackState && msg.playbackState.isPlaying) {
-          if (msg.playbackState.sourceType === 'youtube') {
-            handleYouTubePlayCue(msg.playbackState.youtubeVideoId, msg.playbackState.position);
-          } else if (audioEngine.ctx) {
-            audioEngine.schedulePlayback(
-              msg.playbackState.targetMasterTime,
-              syncEngine ? syncEngine.now() : performance.now(),
-              msg.playbackState.position
-            );
-            setPlayButtonState(true);
+        if (msg.playbackState) {
+          pendingPlaybackState = msg.playbackState;
+          if (msg.playbackState.isPlaying) {
+            if (audioEngine.ctx) {
+              if (msg.playbackState.sourceType === 'youtube') {
+                handleYouTubePlayCue(msg.playbackState.youtubeVideoId, msg.playbackState.position);
+              } else if (currentTrack && currentTrack.type === 'audio') {
+                audioEngine.loadTrack(currentTrack.url).then(() => {
+                  audioEngine.schedulePlayback(
+                    msg.playbackState.targetMasterTime,
+                    syncEngine ? syncEngine.now() : performance.now(),
+                    msg.playbackState.position
+                  );
+                  setPlayButtonState(true);
+                });
+              }
+            }
           }
         }
         break;
@@ -329,13 +415,20 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'play_cue':
         currentTrack = msg.track;
         updateTrackUi(currentTrack);
+        pendingPlaybackState = {
+          isPlaying: true,
+          position: msg.position,
+          targetMasterTime: msg.targetMasterTime,
+          sourceType: msg.sourceType
+        };
+
         if (msg.sourceType === 'youtube') {
           handleYouTubePlayCue(msg.youtubeVideoId, msg.position);
         } else if (audioEngine.ctx) {
           audioEngine.loadTrack(currentTrack.url).then(() => {
             audioEngine.schedulePlayback(
               msg.targetMasterTime,
-              syncEngine.now(),
+              syncEngine ? syncEngine.now() : performance.now(),
               msg.position
             );
             setPlayButtonState(true);
@@ -344,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
 
       case 'pause_cue':
+        pendingPlaybackState = { isPlaying: false, position: msg.position };
         if (msg.sourceType === 'youtube') {
           if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
         } else {
@@ -358,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (audioEngine.ctx && msg.isPlaying) {
           audioEngine.schedulePlayback(
             msg.targetMasterTime,
-            syncEngine.now(),
+            syncEngine ? syncEngine.now() : performance.now(),
             msg.position
           );
         } else {
@@ -374,11 +468,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentTrack.type === 'youtube') {
           handleYouTubeTrackChange(currentTrack.youtubeVideoId, msg.autoplay);
         } else if (audioEngine.ctx) {
-          audioEngine.loadTrack(currentTrack.url);
-          if (msg.autoplay) {
-            audioEngine.schedulePlayback(msg.targetMasterTime, syncEngine.now(), 0);
-            setPlayButtonState(true);
-          }
+          audioEngine.loadTrack(currentTrack.url).then(() => {
+            if (msg.autoplay) {
+              audioEngine.schedulePlayback(msg.targetMasterTime, syncEngine ? syncEngine.now() : performance.now(), 0);
+              setPlayButtonState(true);
+            }
+          });
         }
         renderTrackShelf();
         break;
@@ -409,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !syncEngine) return;
     ws.send(JSON.stringify({
       type: 'telemetry_update',
+      deviceName: myDeviceName,
       rtt: syncEngine.roundTripTime,
       jitter: syncEngine.jitter,
       offset: syncEngine.clockOffset,
@@ -945,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
             <div class="node-avatar" style="width:32px; height:32px; border-radius:6px; background:rgba(0,242,254,0.1); border:1px solid var(--neon-cyan); display:flex; align-items:center; justify-content:center; color:var(--neon-cyan);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
                 <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                 <line x1="12" y1="18" x2="12.01" y2="18"></line>
               </svg>
@@ -1009,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ua = navigator.userAgent;
     if (/iPhone/i.test(ua)) return 'iPhone Spatial Node';
     if (/iPad/i.test(ua)) return 'iPad Audio Console';
-    if (/Android/i.test(ua)) return 'Android Spatial Node';
+    if (/Android/i.test(ua)) return 'Android Audio Node';
     if (/Macintosh/i.test(ua)) return 'MacBook Master Desk';
     if (/Windows/i.test(ua)) return 'Windows Master Host';
     return 'Spatial Audio Node';

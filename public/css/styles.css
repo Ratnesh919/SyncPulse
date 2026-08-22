@@ -1098,6 +1098,55 @@ body {
   box-shadow: 0 0 12px var(--neon-magenta);
 }
 
+/* Device Name Pill */
+.device-name-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  border-radius: var(--radius-full);
+  color: var(--neon-cyan);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.device-name-pill:hover {
+  background: rgba(0, 242, 254, 0.18);
+  border-color: var(--neon-cyan);
+}
+
+.device-name-pill svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(3, 5, 9, 0.9);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.modal-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 12px var(--neon-cyan-glow);
+}
+
 /* Modals & Toasts */
 .modal-backdrop {
   position: fixed;
@@ -1123,7 +1172,7 @@ body {
   border: 1px solid var(--border-highlight);
   border-radius: var(--radius-lg);
   padding: 24px;
-  max-width: 480px;
+  max-width: 440px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -1133,13 +1182,13 @@ body {
 }
 
 .btn-solid-primary {
-  padding: 8px 16px;
+  padding: 10px 18px;
   background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
   border: none;
   border-radius: var(--radius-sm);
   color: #000;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -1150,7 +1199,7 @@ body {
 }
 
 .btn-glass-secondary {
-  padding: 6px 12px;
+  padding: 7px 14px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
@@ -1186,4 +1235,141 @@ body {
   font-size: 0.8rem;
   box-shadow: var(--shadow-elevated);
   pointer-events: auto;
+}
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE OPTIMIZATIONS
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .app-wrapper {
+    padding: 10px 12px 60px;
+  }
+  .studio-trio-grid {
+    grid-template-columns: 1fr;
+  }
+  .visualizer-viewport {
+    height: 280px;
+  }
+  .control-console {
+    height: auto;
+    min-height: 380px;
+  }
+  .mini-youtube-panel {
+    height: 340px;
+  }
+}
+
+@media (max-width: 768px) {
+  .master-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .brand-wrapper {
+    justify-content: flex-start;
+  }
+
+  .atmosphere-picker {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 6px;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+
+  .atmosphere-picker::-webkit-scrollbar {
+    display: none;
+  }
+
+  .header-telemetry-cluster {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .nav-dock {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .dock-tab {
+    font-size: 0.75rem;
+    padding: 8px 10px;
+  }
+
+  .visualizer-viewport {
+    height: 240px;
+  }
+
+  .track-billboard {
+    gap: 10px;
+  }
+
+  .vinyl-casing {
+    width: 44px;
+    height: 44px;
+  }
+
+  .track-main-title {
+    font-size: 0.95rem;
+  }
+
+  .transport-core {
+    gap: 6px;
+  }
+
+  .btn-tactile-sm {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-tactile.master-trigger {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-wrapper {
+    padding: 6px 8px 60px;
+  }
+
+  .brand-title {
+    font-size: 1.05rem;
+  }
+
+  .header-telemetry-cluster {
+    gap: 4px;
+  }
+
+  .room-capsule,
+  .status-pill,
+  #btn-share-qr,
+  .device-name-pill {
+    font-size: 0.65rem;
+    padding: 3px 6px;
+  }
+
+  .device-name-pill {
+    max-width: 90px;
+  }
+
+  .spatial-mode-trio {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 3px;
+  }
+
+  .mode-btn {
+    font-size: 0.65rem;
+    padding: 4px 2px;
+  }
+
+  .modal-container {
+    padding: 18px 14px;
+    margin: 10px;
+  }
 }

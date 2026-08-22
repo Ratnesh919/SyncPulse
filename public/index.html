@@ -36,7 +36,7 @@
         </div>
       </div>
 
-      <!-- Atmospheric Theme Mood Selector (Snow, Thunder, EQ, Rain, Hearts, Stars, Sparks) -->
+      <!-- Atmospheric Theme Mood Selector -->
       <div class="atmosphere-picker">
         <span class="atmo-label">Atmosphere</span>
         <button class="atmo-btn active" data-theme="snow" title="Drifting Snowflakes & Cold Mood">❄️ Snow</button>
@@ -49,6 +49,15 @@
       </div>
 
       <div class="header-telemetry-cluster">
+        <!-- User Device Name Pill (Click to Rename) -->
+        <button id="btn-edit-device" class="device-name-pill" title="Click to rename this device">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          <span id="my-device-label">My Device</span>
+        </button>
+
         <div id="sync-badge" class="status-pill syncing">
           <span class="pulse-beacon"></span>
           <span id="sync-text">Syncing Clock...</span>
@@ -77,7 +86,7 @@
           <circle cx="12" cy="12" r="10"></circle>
           <polygon points="10 8 16 12 10 16 10 8"></polygon>
         </svg>
-        Live Studio, 8D & YouTube Desk
+        Live Studio & YouTube
       </button>
       <button class="dock-tab" data-tab="fleet">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -86,7 +95,7 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
           <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
-        Dolby Fleet Matrix (<span id="device-count-badge">1 Online</span>)
+        Dolby Fleet (<span id="device-count-badge">1 Online</span>)
       </button>
       <button class="dock-tab" data-tab="calibrator">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -94,7 +103,7 @@
           <line x1="12" y1="3" x2="12" y2="7"></line>
           <line x1="12" y1="17" x2="12" y2="21"></line>
         </svg>
-        Latency & Bluetooth Calibrator
+        Bluetooth Calibrator
       </button>
     </nav>
 
@@ -283,12 +292,15 @@
 
     <!-- Panel 2: Dolby Fleet Matrix -->
     <section id="panel-fleet" class="tab-panel">
-      <div style="background:var(--bg-card); backdrop-filter:blur(24px); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="background:var(--bg-card); backdrop-filter:blur(24px); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
           <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:700; color:#fff;">Connected Dolby Audio Nodes</h2>
           <p style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Assign each phone as Front, Center, Rear, or Subwoofer (with mobile haptic bass vibration!).</p>
         </div>
-        <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="font-size:0.8rem; padding:8px 16px;">+ Connect Phone</button>
+        <div style="display:flex; gap:8px;">
+          <button onclick="document.getElementById('btn-edit-device').click()" class="btn-glass-secondary" style="font-size:0.8rem; padding:8px 14px;">✏️ Rename Device</button>
+          <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="font-size:0.8rem; padding:8px 16px;">+ Connect Phone</button>
+        </div>
       </div>
 
       <div id="fleet-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;"></div>
@@ -343,7 +355,7 @@
     </section>
   </div>
 
-  <!-- Modal: Arm Audio Engine -->
+  <!-- Modal: Arm & Join Room with Device Setup -->
   <div id="modal-arm" class="modal-backdrop">
     <div class="modal-container">
       <div class="brand-emblem" style="width:48px; height:48px; margin:0 auto;">
@@ -352,11 +364,33 @@
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
         </svg>
       </div>
-      <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Arm Spatial Audio Engine</div>
-      <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
-        Tap below to activate high-precision hardware audio decoding and lock in synchronization with the master network clock.
+      <div id="join-modal-title" style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Join Spatial Audio Fleet</div>
+      <p id="join-modal-desc" style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
+        Enter a name for your device and tap below to activate synchronized spatial audio playback.
       </p>
-      <button id="btn-arm-audio" class="btn-solid-primary">⚡ Activate & Sync Audio</button>
+
+      <!-- Device Name Setup -->
+      <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+        <label for="device-name-input" style="font-size:0.72rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Your Device Name</label>
+        <input type="text" id="device-name-input" class="modal-input" placeholder="e.g. Ratnesh's Phone, Living Room Speaker" maxlength="30">
+      </div>
+
+      <button id="btn-arm-audio" class="btn-solid-primary" style="padding:12px; font-size:0.95rem; width:100%;">⚡ Tap to Join & Sync Audio</button>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Device Name -->
+  <div id="modal-edit-name" class="modal-backdrop">
+    <div class="modal-container">
+      <div style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:#fff;">Rename Your Audio Device</div>
+      <div style="display:flex; flex-direction:column; gap:6px; text-align:left; margin-top:8px;">
+        <label for="edit-name-input" style="font-size:0.72rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase;">Device Name</label>
+        <input type="text" id="edit-name-input" class="modal-input" placeholder="e.g. iPhone Front Left" maxlength="30">
+      </div>
+      <div style="display:flex; gap:8px; justify-content:center; margin-top:6px;">
+        <button id="btn-save-device-name" class="btn-solid-primary" style="padding:8px 20px;">Save Name</button>
+        <button id="btn-cancel-device-name" class="btn-glass-secondary">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -364,7 +398,7 @@
   <div id="modal-qr" class="modal-backdrop">
     <div class="modal-container">
       <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Connect Additional Phones</div>
-      <p style="font-size:0.8rem; color:var(--text-secondary);">Scan with your phone's camera on the same Wi-Fi network.</p>
+      <p style="font-size:0.8rem; color:var(--text-secondary);">Scan with your phone's camera to join this audio room.</p>
       <div style="display:flex; justify-content:center; padding:12px; background:#030509; border-radius:10px; border:1px solid var(--border-medium);">
         <img id="qr-image" alt="QR Code" style="max-width:180px; width:100%; border-radius:6px;">
       </div>
