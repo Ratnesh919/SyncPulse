@@ -1,7 +1,7 @@
 /**
  * SyncPulse Application Controller
  * Handles NTP Clock Sync, Web Audio Engine, Mini YouTube Search & Sync,
- * 8D & Dolby 5.1/7.1 Spatial Matrix, and Dynamic Atmosphere Particles.
+ * 8D & Dolby 5.1/7.1 Spatial Matrix, Dynamic Atmosphere Particles, and Live Room Chat.
  */
 document.addEventListener('DOMContentLoaded', () => {
   // Navigation
@@ -78,6 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnStepDown = document.getElementById('btn-step-down');
   const btnStepUp = document.getElementById('btn-step-up');
 
+  // Live Chat Elements
+  const chatForm = document.getElementById('chat-form');
+  const chatTextInput = document.getElementById('chat-text-input');
+  const chatMessagesContainer = document.getElementById('chat-messages-container');
+  const chatBadge = document.getElementById('chat-badge');
+  const chatOnlineCount = document.getElementById('chat-online-count');
+  const reactionChips = document.querySelectorAll('.reaction-chip');
+
   // Visualizer 3D Mode Buttons
   const visButtons = document.querySelectorAll('.vis-btn-mini');
   const visualizerCanvas = document.getElementById('visualizer-canvas');
@@ -107,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let tracks = [];
   let currentSpatialMode = 'normal';
   let pendingPlaybackState = null;
+  let unreadChatCount = 0;
+  let activeTabName = 'studio';
 
   // YouTube Player State
   let ytPlayer = null;
@@ -123,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModals();
     setupControls();
     setupYouTubeDesk();
+    setupLiveChat();
     
     // Parse URL room code
     const urlParams = new URLSearchParams(window.location.search);
@@ -209,13 +220,52 @@ document.addEventListener('DOMContentLoaded', () => {
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         const targetTab = tab.dataset.tab;
+        activeTabName = targetTab;
         tabs.forEach(t => t.classList.remove('active'));
         panels.forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         const activePanel = document.getElementById(`panel-${targetTab}`);
         if (activePanel) activePanel.classList.add('active');
+
+        // Clear chat unread badge when entering chat
+        if (targetTab === 'chat') {
+          unreadChatCount = 0;
+          if (chatBadge) chatBadge.style.display = 'none';
+          if (chatMessagesContainer) {
+            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+          }
+        }
       });
     });
+  }
+
+  function setupLiveChat() {
+    if (chatForm) {
+      chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = chatTextInput.value.trim();
+        if (!text) return;
+        sendChatMessage(text);
+        chatTextInput.value = '';
+      });
+    }
+
+    reactionChips.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.dataset.emoji;
+        sendChatMessage(emoji, emoji);
+      });
+    });
+  }
+
+  function sendChatMessage(text, reaction = null) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({
+      type: 'chat_message',
+      text,
+      reaction,
+      deviceName: myDeviceName
+    }));
   }
 
   function setupModals() {
@@ -491,12 +541,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
       case 'peer_list_update':
         renderFleetMatrix(msg.peers);
+        if (chatOnlineCount) {
+          chatOnlineCount.textContent = `${msg.peers.length} ${msg.peers.length === 1 ? 'Device' : 'Devices'}`;
+        }
         break;
 
       case 'channel_assigned':
         audioEngine.setChannelMode(msg.channel);
         showToast(`🎚 Surround Channel Assigned: ${msg.channel.toUpperCase()}`);
         break;
+
+      case 'chat_message':
+        renderIncomingChatMessage(msg);
+        break;
+    }
+  }
+
+  function renderIncomingChatMessage(msg) {
+    if (!chatMessagesContainer) return;
+
+    const isMe = msg.peerId === myPeerId;
+    const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const row = document.createElement('div');
+    row.className = `chat-msg-row ${isMe ? 'my-msg' : 'peer-msg'}`;
+
+    const roleClass = msg.role === 'host' ? 'host' : 'guest';
+    const roleText = msg.role === 'host' ? 'Host' : 'Node';
+
+    let contentHtml = '';
+    if (msg.reaction) {
+      contentHtml = `<span class="chat-reaction-display">${msg.text}</span>`;
+    } else {
+      // Escape HTML
+      const escaped = msg.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      contentHtml = escaped;
+    }
+
+    row.innerHTML = `
+      <div class="chat-msg-meta">
+        <span class="chat-role-badge ${roleClass}">${roleText}</span>
+        <strong>${msg.deviceName}</strong>
+        <span>• ${timeStr}</span>
+      </div>
+      <div class="chat-bubble">
+        ${contentHtml}
+      </div>
+    `;
+
+    chatMessagesContainer.appendChild(row);
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+
+    // If on a different tab, show badge count and subtle toast
+    if (activeTabName !== 'chat') {
+      unreadChatCount++;
+      if (chatBadge) {
+        chatBadge.textContent = unreadChatCount;
+        chatBadge.style.display = 'inline-block';
+      }
+      if (!isMe) {
+        showToast(`💬 ${msg.deviceName}: ${msg.text.substring(0, 35)}`);
+      }
     }
   }
 

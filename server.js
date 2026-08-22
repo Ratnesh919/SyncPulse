@@ -436,6 +436,26 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
+        // Live Room Chat Message
+        case 'chat_message': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.peers.has(ws)) {
+            const peer = room.peers.get(ws);
+            const chatPayload = {
+              type: 'chat_message',
+              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              peerId: peer.id,
+              deviceName: msg.deviceName || peer.deviceName,
+              role: peer.role,
+              text: (msg.text || '').trim().substring(0, 500),
+              reaction: msg.reaction || null,
+              timestamp: Date.now()
+            };
+            broadcastToRoom(room, chatPayload);
+          }
+          break;
+        }
       }
     } catch (err) {
       console.error('WebSocket Error:', err);

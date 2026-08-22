@@ -105,6 +105,12 @@
         </svg>
         Bluetooth Calibrator
       </button>
+      <button class="dock-tab" data-tab="chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Live Chat <span id="chat-badge" class="chat-tab-badge" style="display:none;">0</span>
+      </button>
     </nav>
 
     <!-- Panel 1: Live Studio, 8D & YouTube -->
@@ -351,6 +357,59 @@
             <button id="btn-calibrator-toggle" class="btn-glass-secondary">▶ Start Metronome Test</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Panel 4: Dedicated Live Room Chat -->
+    <section id="panel-chat" class="tab-panel">
+      <div class="chat-workbench">
+        <div class="chat-header-bar">
+          <div>
+            <h2 style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:#fff;">💬 Live Room Chat</h2>
+            <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Chat in real-time with everyone connected to this soundstage room.</p>
+          </div>
+          <div class="chat-online-tag">
+            <span class="pulse-beacon" style="width:6px; height:6px; background:var(--neon-emerald);"></span>
+            <span id="chat-online-count">1 Device</span>
+          </div>
+        </div>
+
+        <!-- Chat Stream Box -->
+        <div id="chat-messages-container" class="chat-messages-container">
+          <div class="chat-welcome-msg">
+            <div class="brand-emblem" style="width:36px; height:36px; margin:0 auto 8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+            </div>
+            <div>Welcome to <strong>SyncPulse Live Room</strong>!</div>
+            <div style="font-size:0.75rem; color:var(--text-tertiary); margin-top:4px;">Messages and song reactions sent here appear instantly on all connected devices.</div>
+          </div>
+        </div>
+
+        <!-- Quick Reaction Soundstage Emojis -->
+        <div class="chat-quick-reactions">
+          <span style="font-size:0.7rem; color:var(--text-tertiary); font-weight:700; margin-right:4px;">REACTIONS:</span>
+          <button class="reaction-chip" data-emoji="🔥">🔥 Fire</button>
+          <button class="reaction-chip" data-emoji="🎧">🎧 8D Vibe</button>
+          <button class="reaction-chip" data-emoji="⚡">⚡ Bass Drop</button>
+          <button class="reaction-chip" data-emoji="💖">💖 Love</button>
+          <button class="reaction-chip" data-emoji="🔊">🔊 Turn Up</button>
+          <button class="reaction-chip" data-emoji="👏">👏 Epic</button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="chat-form" class="chat-input-bar">
+          <input type="text" id="chat-text-input" class="chat-text-input" placeholder="Type a live message..." maxlength="300" autocomplete="off">
+          <button type="submit" id="btn-chat-send" class="btn-solid-primary" style="padding:8px 18px; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+            <span>Send</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px; height:14px;">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
       </div>
     </section>
   </div>
