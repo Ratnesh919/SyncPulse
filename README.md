@@ -1,93 +1,89 @@
-# ⚡ SyncPulse — Multi-Device Synchronized Audio Network
+# 🎧 SyncPulse — High-Definition Synchronized Spatial Audio Network
 
-**SyncPulse** is a real-time web platform that synchronizes audio playback across multiple smartphones, laptops, and Bluetooth speakers with sub-millisecond precision. Designed with an **ECE & Distributed Systems** foundation, it solves network jitter and hardware codec delays using high-precision NTP clock synchronization, Web Audio API hardware buffer scheduling, and an interactive acoustic-visual latency calibration suite.
+**SyncPulse** is a synchronized spatial audio web system engineered to turn multiple smartphones, laptops, and Bluetooth speakers into a cohesive **Dolby 5.1 / 7.1 Surround & 8D Binaural Audio Fleet** with sub-millisecond precision clock synchronization.
 
 ---
 
 ## 🌟 Key Features
 
-- **High-Precision Clock Synchronization:** Implements **Cristian's Algorithm** over WebSockets with statistical outlier rejection and continuous drift tracking to synchronize device clocks within $\pm 5\text{ ms}$.
-- **Interactive Hardware Latency Calibrator:** Compensates for Bluetooth A2DP & DAC buffering delays (50–200ms) through an interactive visual radar metronome with millisecond fine-tuning.
-- **3D WebGL Audio Visualizer:** Powered by Three.js, featuring a frequency-reactive geodesic sphere, pulsing halo ring, and dynamic bass-reactive starfield.
-- **Multi-Speaker Spatial Surround Matrix:** Assign connected devices to **Left Channel**, **Right Channel**, or **Full Stereo** to build an ad-hoc surround sound system from ordinary phones.
-- **Instant Mobile Room Sharing:** Generate 6-digit room PINs and dynamic QR codes. Any phone on the same Wi-Fi network can scan and join instantly without installing apps.
-- **Custom Audio & Synthesized Presets:** Built-in procedural 128 BPM Synthwave, 120 BPM Acoustic Click reference, Lo-Fi tracks, and support for MP3/WAV/AAC file uploads.
-- **Mobile Background Keepalive:** Keeps audio decoding active even when mobile screens or tabs are backgrounded.
+### 1. ⏱️ Cristian's Algorithm NTP Multi-Device Synchronization
+- High-precision master clock offset estimation with median jitter filtering ($\pm 5\text{ ms}$ accuracy).
+- Scheduled Web Audio API hardware buffer playback eliminating network latency discrepancies across devices.
+- Built-in **Hardware & Bluetooth Latency Calibrator** with visual metronome strobe for fine-tuning DAC and Bluetooth buffer delays.
+
+### 2. 🌌 Spatial Acoustic DSP Matrix
+- **8D Binaural 360° Soundstage:** Rotating spherical LFO audio panner with distance attenuation.
+- **Dolby 5.1 & 7.1 Multi-Phone Fleet Matrix:** Dynamically assign connected phones as:
+  - `Front Left` / `Front Right` (Stereo widening & Haas delay)
+  - `Center Channel` (High-clarity vocal bandpass $300\text{ Hz} - 4\text{ kHz}$)
+  - `Subwoofer Channel` ($<120\text{ Hz}$ Low-pass bass rumble with **mobile haptic vibration**)
+  - `Rear Surround Left` / `Rear Surround Right` (Haas precedence effect ambient reflections)
+
+### 3. 📺 Mini YouTube Music Desk & Offline Local Audio Sync
+- **Mini YouTube Search & Stream Desk:** Live keyword search and direct URL pasting with synced playback.
+- **Zero API Key Architecture:** 100% free, direct extraction with zero third-party API keys or cloud quotas.
+- **Offline Direct Storage:** Load local MP3/WAV files for direct multi-phone playback on local Wi-Fi without needing external internet access.
+
+### 4. 🔮 Dynamic Dual-Layer 3D Atmosphere FX Engine
+- **Dual-Layer Parallax Rendering:** Visual effects rendered **both below (behind) and above (over) the glass cards**:
+  - **❄️ Snow:** 6-point crystalline snowflakes and soft snow puffs drifting with wind physics.
+  - **⚡ Thunder:** Purple storm back-glow with branching electric lightning strikes reacting to **heavy bass drops**.
+  - **📊 Equalizer Bars:** Ambient real-time Web Audio DSP frequency spectrum rising behind cards.
+  - **🌧️ Rain:** Falling raindrops with floor splash water ripples.
+  - **💖 Hearts:** Floating glowing neon hearts with sine-wave motion.
+  - **✨ Moving Stars & Shooting Comets:** 3D drifting cosmic starfield with high-speed comets cutting across the screen.
+  - **🔥 Sparks:** High-energy cyber electrical sparks.
+- **Auto-Theme Classifier:** Intelligently detects track moods and keywords from song titles to shift atmospheres automatically!
+
+### 5. 💽 WebGL Three.js Visualizer
+- Multi-mode 3D audio visualizer: **Quantum Core**, **Wave Tunnel**, and **Towers Matrix**.
 
 ---
 
-## 🛠️ System Architecture
+## 🚀 Quick Start Guide
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Host Device                            │
-│  (Uploads audio / selects tracks, controls playback & cues)  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ WebSocket (Commands & Audio Buffers)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Node.js + WebSocket Sync Server                │
-│  • Room Coordinator (UUID / 6-digit PIN)                    │
-│  • NTP Cristian's Sync Engine (Master Clock $\tau_{server}$) │
-│  • Low-latency Audio Stream / Buffer Chunk Broker           │
-└──────────────┬───────────────────────────────┬──────────────┘
-               │                               │
-               ▼                               ▼
-┌──────────────────────────────┐ ┌─────────────────────────────┐
-│    Client 1 (Mobile Phone)   │ │  Client 2 (Bluetooth Speaker│
-│  • Web Audio API Scheduler   │ │  • Web Audio API Scheduler  │
-│  • Hardware Offset Calibrator│ │  • Hardware Offset Calibrator│
-│  • Spatial Channel (Left)    │ │  • Spatial Channel (Right)  │
-│  • 3D Motion Visualizer      │ │  • 3D Motion Visualizer     │
-└──────────────────────────────┘ └─────────────────────────────┘
-```
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v16 or higher)
 
----
-
-## 📐 The Math: Clock Synchronization & Scheduling
-
-### 1. Cristian's NTP Algorithm
-Each client measures round-trip time ($\text{RTT}$) and clock offset ($\theta$):
-$$\text{RTT} = (t_3 - t_0) - (t_2 - t_1)$$
-$$\theta = \frac{(t_1 - t_0) + (t_2 - t_3)}{2}$$
-where:
-- $t_0$: Timestamp client sends `ntp_ping`
-- $t_1$: Server timestamp upon receiving ping
-- $t_2$: Server timestamp upon sending `ntp_pong`
-- $t_3$: Timestamp client receives `ntp_pong`
-
-### 2. Audio Scheduling Formula
-When the Host initiates playback with a future master trigger time $T_{\text{target}}$:
-$$t_{\text{hardware}} = \text{audioCtx.currentTime} + \frac{(T_{\text{target}} - T_{\text{localMasterSynced}}) - \Delta_{\text{hardware}}}{1000}$$
-
----
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
+### Installation
 ```bash
+# Clone the repository
+git clone https://github.com/Ratnesh919/SyncPulse.git
+
+# Navigate into project directory
+cd SyncPulse
+
+# Install dependencies
 npm install
-```
 
-### 2. Start the Server
-```bash
+# Start the server
 npm start
 ```
-The server will start at:
-- **Local Access:** `http://localhost:3000`
-- **Mobile Wi-Fi Access:** `http://<YOUR_LOCAL_IP>:3000`
 
-### 3. Connect Multiple Devices
-1. Open `http://localhost:3000` on your primary computer (Host).
-2. Click **Share QR** or open the URL shown on your phone connected to the same Wi-Fi.
-3. Tap **Activate & Sync Audio** on each device.
-4. If using Bluetooth earbuds, open the **Latency Calibrator** tab to tune the offset.
-5. Hit **Play** on the Host — all devices will blast the track in perfect synchrony!
+### Accessing the App
+1. **Host Computer / Laptop:** Open `http://localhost:3000`
+2. **Mobile Phones / Secondary Devices:** Scan the **QR Code** or connect to `http://<YOUR_LOCAL_IP>:3000?room=<ROOM_CODE>` on the same Wi-Fi network.
 
 ---
 
-## 🧪 Verification & Testing
-Run the automated multi-device sync simulation:
-```bash
-node test_sync.js
+## 🏗️ Architecture Overview
+
 ```
+                          ┌───────────────────────────┐
+                          │   Node.js + Express + WS  │
+                          │   Master Clock (NTP Server)│
+                          └─────────────┬─────────────┘
+                                        │ WebSocket JSON Protocol
+               ┌────────────────────────┼────────────────────────┐
+               ▼                        ▼                        ▼
+       ┌───────────────┐        ┌───────────────┐        ┌───────────────┐
+       │ Phone 1 (FL)  │        │ Phone 2 (C)   │        │ Phone 3 (SUB) │
+       │ Front-Left    │        │ Vocal Center  │        │ Bass + Haptics│
+       │ Web Audio DSP │        │ Web Audio DSP │        │ Web Audio DSP │
+       └───────────────┘        └───────────────┘        └───────────────┘
+```
+
+---
+
+## 📜 License
+MIT License — Free to use, modify, and distribute for personal and educational projects.
