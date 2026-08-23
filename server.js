@@ -280,11 +280,11 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        // Host: Play Cue Trigger
+        // Host: Play Cue Trigger (Host Only)
         case 'play_cue': {
           const room = rooms.get(currentRoomId);
           if (room && (room.hostWs === ws || msg.isHostOverride)) {
-            const leadTime = msg.leadTime || 300;
+            const leadTime = msg.leadTime || 800;
             const targetMasterTime = getServerMasterTime() + leadTime;
 
             room.playbackState = {
@@ -312,10 +312,10 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        // Host: Pause Cue Trigger
+        // Host: Pause Cue Trigger (Host Only)
         case 'pause_cue': {
           const room = rooms.get(currentRoomId);
-          if (room) {
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
             room.playbackState.isPlaying = false;
             room.playbackState.position = msg.position || 0;
 
@@ -329,11 +329,11 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        // Host: Seek Cue Trigger
+        // Host: Seek Cue Trigger (Host Only)
         case 'seek_cue': {
           const room = rooms.get(currentRoomId);
-          if (room) {
-            const leadTime = msg.leadTime || 300;
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+            const leadTime = msg.leadTime || 600;
             const targetMasterTime = getServerMasterTime() + leadTime;
             room.playbackState.position = msg.position;
             room.playbackState.targetMasterTime = targetMasterTime;
@@ -350,17 +350,17 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        // Host: Change Track (Audio or YouTube)
+        // Host: Change Track (Host Only)
         case 'change_track': {
           const room = rooms.get(currentRoomId);
-          if (room) {
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
             room.currentTrack = msg.track;
             room.playbackState.position = 0;
             room.playbackState.isPlaying = msg.autoplay || false;
             room.playbackState.sourceType = msg.track.type || 'audio';
             room.playbackState.youtubeVideoId = msg.track.youtubeVideoId || null;
 
-            const leadTime = 350;
+            const leadTime = 800;
             const targetMasterTime = getServerMasterTime() + leadTime;
             room.playbackState.targetMasterTime = targetMasterTime;
 
@@ -375,10 +375,10 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        // Host: Set Spatial Sound Mode (Normal / 8D / Dolby Surround)
+        // Host: Set Spatial Sound Mode (Host Only)
         case 'set_spatial_mode': {
           const room = rooms.get(currentRoomId);
-          if (room) {
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
             room.spatialMode = msg.spatialMode; // 'normal', '8d', 'dolby'
             broadcastToRoom(room, {
               type: 'spatial_mode_changed',
@@ -392,10 +392,10 @@ wss.on('connection', (ws) => {
         // Host: Run Channel Speaker Placement Test Sound
         case 'test_channel_cue': {
           const room = rooms.get(currentRoomId);
-          if (room) {
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
             broadcastToRoom(room, {
               type: 'test_channel_cue',
-              targetChannel: msg.targetChannel, // 'left', 'right', 'center', 'subwoofer', 'rear-left', 'rear-right', 'all'
+              targetChannel: msg.targetChannel,
               serverTime: getServerMasterTime()
             });
           }

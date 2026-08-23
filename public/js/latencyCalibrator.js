@@ -1,6 +1,8 @@
 /**
- * LatencyCalibrator: Interactive Audio-Visual Hardware Latency Compensation Tool
- * Helps users calibrate Bluetooth A2DP / DAC buffer delays.
+ * LatencyCalibrator: Audio Latency & Synchronizer Calibration Tool
+ * Features:
+ * 1. Visual Strobe Metronome for manual delay alignment
+ * 2. ⚡ One-Click Automatic Hardware & Codec Latency Calibration
  */
 class LatencyCalibrator {
   constructor(audioEngine) {
@@ -13,6 +15,24 @@ class LatencyCalibrator {
     this.animFrameId = null;
     this.onFlashCallback = null;
     this.onOffsetChangeCallback = null;
+  }
+
+  autoCalibrate() {
+    if (!this.audioEngine.ctx) return 0;
+    const hwLatencyMs = this.audioEngine.autoCalibrateHardwareDelay();
+    
+    // Platform-specific audio driver calibration heuristic
+    let estimatedBufferMs = 0;
+    const ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      estimatedBufferMs = 15;
+    } else if (/Android/i.test(ua)) {
+      estimatedBufferMs = 30;
+    }
+
+    const totalCalculated = Math.round(hwLatencyMs + estimatedBufferMs);
+    this.setOffset(totalCalculated);
+    return totalCalculated;
   }
 
   start() {
@@ -44,9 +64,7 @@ class LatencyCalibrator {
     const ctx = this.audioEngine.ctx;
     const now = ctx.currentTime;
 
-    // Schedule audio click ahead
     while (this.nextBeatTime < now + 0.1) {
-      // Audio click scheduled with hardware latency compensation
       const audioClickTime = this.nextBeatTime - (this.offsetMs / 1000);
       if (audioClickTime >= now) {
         this.playBeep(audioClickTime);
@@ -54,7 +72,6 @@ class LatencyCalibrator {
       this.nextBeatTime += this.intervalSec;
     }
 
-    // Visual trigger check: flash visual at exact metronome beat time
     const beatFraction = (now % this.intervalSec) / this.intervalSec;
     const isFlash = beatFraction < 0.12;
 

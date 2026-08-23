@@ -19,6 +19,9 @@
   <!-- Atmospheric Layer 2: Overlay (Above/Over cards - floating snow, rain, hearts, lightning) -->
   <canvas id="atmosphere-overlay"></canvas>
 
+  <!-- Google Meet-Style Rising Floating Messages & Reactions Screen Layer -->
+  <div id="screen-floating-reactions-layer" class="screen-floating-reactions-layer"></div>
+
   <div class="app-wrapper">
     <!-- Master Header -->
     <header class="master-header">
@@ -67,6 +70,9 @@
           <span>ROOM</span>
           <strong id="room-code-text">------</strong>
         </div>
+        <button id="btn-open-join-modal" class="btn-solid-primary" style="padding: 5px 12px; font-size: 0.75rem; display:flex; align-items:center; gap:5px;">
+          🔑 Join Room
+        </button>
         <button id="btn-share-qr" class="btn-glass-secondary" style="padding: 5px 10px; font-size: 0.75rem; display:flex; align-items:center; gap:5px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"></rect>
@@ -103,7 +109,7 @@
           <line x1="12" y1="3" x2="12" y2="7"></line>
           <line x1="12" y1="17" x2="12" y2="21"></line>
         </svg>
-        Bluetooth Calibrator
+        Audio Calibrator
       </button>
       <button class="dock-tab" data-tab="chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -157,6 +163,15 @@
                 </span>
               </div>
             </div>
+          </div>
+
+          <!-- Guest Lock Notice (Hidden for Host) -->
+          <div id="guest-control-lock-notice" class="guest-lock-banner" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; flex-shrink:0;">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>Playback is synchronized & controlled by Host</span>
           </div>
 
           <!-- Spatial Acoustic Engine Mode Selector -->
@@ -312,15 +327,19 @@
       <div id="fleet-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;"></div>
     </section>
 
-    <!-- Panel 3: Latency Calibrator -->
+    <!-- Panel 3: Audio Calibrator -->
     <section id="panel-calibrator" class="tab-panel">
       <div class="calibrator-workbench" style="background:var(--bg-card); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:24px; display:flex; flex-direction:column; gap:20px;">
-        <div>
-          <h2 style="font-family:var(--font-display); font-size:1.2rem; font-weight:700; color:#fff;">Hardware & Bluetooth Latency Calibrator</h2>
-          <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:4px;">
-            Bluetooth headphones and DACs introduce a 50–200ms codec buffer delay. 
-            Adjust your offset until the audio click matches the strobe circle flash.
-          </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2 style="font-family:var(--font-display); font-size:1.2rem; font-weight:700; color:#fff;">Hardware & Bluetooth Audio Calibrator</h2>
+            <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:4px;">
+              Automatically measures DAC and audio buffer latency for exact millisecond phase-lock sync.
+            </p>
+          </div>
+          <button id="btn-auto-calibrate" class="btn-solid-primary" style="padding:10px 18px; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+            ⚡ Auto-Calibrate Sync
+          </button>
         </div>
 
         <div class="strobe-visual-arena" style="position:relative; height:180px; background:radial-gradient(circle at center, rgba(0,242,254,0.08) 0%, #030509 85%); border:1px solid var(--border-medium); border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
@@ -337,7 +356,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:rgba(0,0,0,0.4); border:1px solid var(--border-medium); border-radius:10px;">
             <div>
               <div style="font-size:0.68rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:1px; font-weight:700;">Hardware Offset Compensation</div>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">Fine-tune your device delay in milliseconds.</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">Fine-tune or auto-calibrate your device buffer delay.</div>
             </div>
             <div id="offset-val-display" style="font-family:var(--font-mono); font-size:1.8rem; font-weight:800; color:var(--neon-cyan);">+0 ms</div>
           </div>
@@ -366,7 +385,7 @@
         <div class="chat-header-bar">
           <div>
             <h2 style="font-family:var(--font-display); font-size:1.15rem; font-weight:700; color:#fff;">💬 Live Room Chat</h2>
-            <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Chat in real-time with everyone connected to this soundstage room.</p>
+            <p style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Chat and send soundstage reactions that flow up across all connected screens!</p>
           </div>
           <div class="chat-online-tag">
             <span class="pulse-beacon" style="width:6px; height:6px; background:var(--neon-emerald);"></span>
@@ -384,7 +403,7 @@
               </svg>
             </div>
             <div>Welcome to <strong>SyncPulse Live Room</strong>!</div>
-            <div style="font-size:0.75rem; color:var(--text-tertiary); margin-top:4px;">Messages and song reactions sent here appear instantly on all connected devices.</div>
+            <div style="font-size:0.75rem; color:var(--text-tertiary); margin-top:4px;">Messages and song reactions sent here rise up on all connected screens in real time.</div>
           </div>
         </div>
 
@@ -414,7 +433,39 @@
     </section>
   </div>
 
-  <!-- Modal: Arm & Join Room with Device Setup -->
+  <!-- Modal: Direct Join Room (By Code/PIN) -->
+  <div id="modal-join-picker" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="brand-emblem" style="width:48px; height:48px; margin:0 auto;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+          <polyline points="10 17 15 12 10 7"></polyline>
+          <line x1="15" y1="12" x2="3" y2="12"></line>
+        </svg>
+      </div>
+      <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Join an Audio Room</div>
+      <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
+        Enter the 6-character room PIN from the host or other phones to sync your soundstage.
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+        <label for="input-room-pin" style="font-size:0.72rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase;">Room PIN / Code</label>
+        <input type="text" id="input-room-pin" class="modal-input" placeholder="e.g. 8K7M2P" maxlength="8" style="text-transform:uppercase; font-family:var(--font-mono); font-size:1.1rem; letter-spacing:2px; text-align:center;">
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
+        <label for="input-join-device-name" style="font-size:0.72rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase;">Device Name</label>
+        <input type="text" id="input-join-device-name" class="modal-input" placeholder="e.g. Living Room Phone" maxlength="30">
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button id="btn-submit-join-room" class="btn-solid-primary" style="flex:1; padding:10px;">🚀 Join & Sync</button>
+        <button id="btn-cancel-join-room" class="btn-glass-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Initial Arm & Join Audio Setup -->
   <div id="modal-arm" class="modal-backdrop">
     <div class="modal-container">
       <div class="brand-emblem" style="width:48px; height:48px; margin:0 auto;">

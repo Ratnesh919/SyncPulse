@@ -1316,6 +1316,99 @@ body {
   transform: scale(1.05);
 }
 
+/* ==========================================================================
+   GOOGLE MEET / LIVE STREAM STYLE RISING FLOATING REACTION BUBBLES
+   ========================================================================== */
+.screen-floating-reactions-layer {
+  position: fixed;
+  bottom: 30px;
+  right: 24px;
+  width: 320px;
+  height: 80vh;
+  pointer-events: none;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.floating-screen-reaction-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(14, 19, 34, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), var(--shadow-glow-cyan);
+  animation: floatUpScreen 4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.floating-screen-reaction-item.is-emoji {
+  font-size: 1.4rem;
+  padding: 6px 12px;
+  border-color: rgba(255, 0, 127, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), var(--shadow-glow-magenta);
+}
+
+.floating-reaction-sender {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+}
+
+@keyframes floatUpScreen {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.75);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0px) scale(1.05);
+  }
+  30% {
+    transform: translateY(-30px) scale(1) translateX(-6px);
+  }
+  60% {
+    opacity: 0.9;
+    transform: translateY(-120px) translateX(6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-260px) scale(0.9) translateX(-4px);
+  }
+}
+
+/* Guest Lock Notice Banner */
+.guest-lock-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px dashed rgba(0, 242, 254, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--neon-cyan);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.guest-disabled-control {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
 .chat-input-bar {
   display: flex;
   gap: 8px;

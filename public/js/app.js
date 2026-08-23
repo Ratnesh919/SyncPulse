@@ -1,7 +1,7 @@
 /**
  * SyncPulse Application Controller
  * Handles NTP Clock Sync, Web Audio Engine, Mini YouTube Search & Sync,
- * 8D & Dolby 5.1/7.1 Spatial Matrix, Dynamic Atmosphere Particles, and Live Room Chat.
+ * 8D & Dolby 5.1/7.1 Spatial Matrix, Dynamic Atmosphere Particles, Live Room Chat & Rising Floating Reactions.
  */
 document.addEventListener('DOMContentLoaded', () => {
   // Navigation
@@ -14,9 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const rttDisplay = document.getElementById('rtt-display');
   const roomCodeText = document.getElementById('room-code-text');
   const btnShareQr = document.getElementById('btn-share-qr');
+  const btnOpenJoinModal = document.getElementById('btn-open-join-modal');
   const atmoButtons = document.querySelectorAll('.atmo-btn');
   const atmosphereUnderlay = document.getElementById('atmosphere-underlay');
   const atmosphereOverlay = document.getElementById('atmosphere-overlay');
+  const floatingReactionsLayer = document.getElementById('screen-floating-reactions-layer');
 
   // Device Name Controls
   const btnEditDevice = document.getElementById('btn-edit-device');
@@ -29,7 +31,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const joinModalTitle = document.getElementById('join-modal-title');
   const joinModalDesc = document.getElementById('join-modal-desc');
 
-  // Player Elements
+  // Direct Join Room Modal
+  const modalJoinPicker = document.getElementById('modal-join-picker');
+  const inputRoomPin = document.getElementById('input-room-pin');
+  const inputJoinDeviceName = document.getElementById('input-join-device-name');
+  const btnSubmitJoinRoom = document.getElementById('btn-submit-join-room');
+  const btnCancelJoinRoom = document.getElementById('btn-cancel-join-room');
+
+  // Player Elements & Guest Lock Banner
+  const guestLockNotice = document.getElementById('guest-control-lock-notice');
   const trackTitle = document.getElementById('track-title');
   const trackArtist = document.getElementById('track-artist');
   const vinylDisc = document.getElementById('vinyl-disc');
@@ -69,7 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const fleetGrid = document.getElementById('fleet-grid');
   const deviceCountBadge = document.getElementById('device-count-badge');
 
-  // Calibrator Elements
+  // Audio Calibrator Elements
+  const btnAutoCalibrate = document.getElementById('btn-auto-calibrate');
   const calibratorMarker = document.getElementById('calibrator-marker');
   const offsetSlider = document.getElementById('offset-slider');
   const offsetValDisplay = document.getElementById('offset-val-display');
@@ -127,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function init() {
     if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
     if (deviceNameInput) deviceNameInput.value = myDeviceName;
+    if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
 
     setupAtmosphere();
     setupTabNavigation();
@@ -154,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     roomCodeText.textContent = currentRoomId;
+    updateRoleUi();
 
     connectWebSocket();
     await fetchServerInfo();
@@ -176,6 +189,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show initial join modal to unlock audio context on mobile & confirm device name
     modalArm.classList.add('active');
+  }
+
+  function updateRoleUi() {
+    if (myRole === 'guest') {
+      if (guestLockNotice) guestLockNotice.style.display = 'flex';
+      if (btnPlay) btnPlay.classList.add('guest-disabled-control');
+      if (btnStop) btnStop.classList.add('guest-disabled-control');
+      if (btnPrevTrack) btnPrevTrack.classList.add('guest-disabled-control');
+      if (btnNextTrack) btnNextTrack.classList.add('guest-disabled-control');
+      if (progressBar) progressBar.classList.add('guest-disabled-control');
+    } else {
+      if (guestLockNotice) guestLockNotice.style.display = 'none';
+      if (btnPlay) btnPlay.classList.remove('guest-disabled-control');
+      if (btnStop) btnStop.classList.remove('guest-disabled-control');
+      if (btnPrevTrack) btnPrevTrack.classList.remove('guest-disabled-control');
+      if (btnNextTrack) btnNextTrack.classList.remove('guest-disabled-control');
+      if (progressBar) progressBar.classList.remove('guest-disabled-control');
+    }
   }
 
   function setupAtmosphere() {
@@ -227,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const activePanel = document.getElementById(`panel-${targetTab}`);
         if (activePanel) activePanel.classList.add('active');
 
-        // Clear chat unread badge when entering chat
         if (targetTab === 'chat') {
           unreadChatCount = 0;
           if (chatBadge) chatBadge.style.display = 'none';
@@ -305,6 +335,36 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // Direct Join Room Modal Trigger
+    if (btnOpenJoinModal) {
+      btnOpenJoinModal.addEventListener('click', () => {
+        inputRoomPin.value = '';
+        if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
+        modalJoinPicker.classList.add('active');
+        inputRoomPin.focus();
+      });
+    }
+
+    if (btnSubmitJoinRoom) {
+      btnSubmitJoinRoom.addEventListener('click', () => {
+        const pin = inputRoomPin.value.trim().toUpperCase();
+        if (!pin || pin.length < 3) {
+          showToast('⚠️ Please enter a valid room PIN');
+          return;
+        }
+        const devName = inputJoinDeviceName.value.trim() || myDeviceName;
+        myDeviceName = devName;
+        localStorage.setItem('syncpulse_device_name', myDeviceName);
+        window.location.href = `${window.location.pathname}?room=${pin}`;
+      });
+    }
+
+    if (btnCancelJoinRoom) {
+      btnCancelJoinRoom.addEventListener('click', () => {
+        modalJoinPicker.classList.remove('active');
+      });
+    }
+
     // Rename Device Modal
     if (btnEditDevice) {
       btnEditDevice.addEventListener('click', () => {
@@ -367,6 +427,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tracks.length > 0 && !currentTrack) {
         currentTrack = tracks[0];
         updateTrackUi(currentTrack);
+        // Preload first track into cache
+        if (currentTrack.url) {
+          audioEngine.loadTrack(currentTrack.url).catch(() => {});
+        }
       }
       renderTrackShelf();
     } catch (e) {
@@ -384,6 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
       syncText.textContent = 'Syncing...';
 
       syncEngine = new SyncEngine(ws);
+      audioEngine.setSyncEngine(syncEngine);
+
       syncEngine.onSyncUpdate((stats) => {
         if (stats.isSynchronized) {
           syncBadge.className = 'status-pill';
@@ -434,12 +500,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       case 'room_joined':
         myPeerId = msg.peerId;
+        myRole = msg.role;
+        updateRoleUi();
+
         if (msg.spatialMode) {
           setSpatialModeUi(msg.spatialMode);
         }
         if (msg.currentTrack) {
           currentTrack = msg.currentTrack;
           updateTrackUi(currentTrack);
+          if (currentTrack.url) {
+            audioEngine.loadTrack(currentTrack.url).catch(() => {});
+          }
         }
         if (msg.playbackState) {
           pendingPlaybackState = msg.playbackState;
@@ -553,8 +625,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
       case 'chat_message':
         renderIncomingChatMessage(msg);
+        spawnRisingScreenReaction(msg);
         break;
     }
+  }
+
+  function spawnRisingScreenReaction(msg) {
+    if (!floatingReactionsLayer) return;
+
+    const item = document.createElement('div');
+    const isEmoji = !!msg.reaction;
+    item.className = `floating-screen-reaction-item ${isEmoji ? 'is-emoji' : ''}`;
+
+    if (isEmoji) {
+      item.innerHTML = `<span>${msg.text}</span> <span class="floating-reaction-sender">${msg.deviceName}</span>`;
+    } else {
+      const escaped = msg.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      item.innerHTML = `<span class="floating-reaction-sender">${msg.deviceName}:</span> <span>${escaped}</span>`;
+    }
+
+    floatingReactionsLayer.appendChild(item);
+    setTimeout(() => {
+      item.remove();
+    }, 4100);
   }
 
   function renderIncomingChatMessage(msg) {
@@ -573,7 +666,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (msg.reaction) {
       contentHtml = `<span class="chat-reaction-display">${msg.text}</span>`;
     } else {
-      // Escape HTML
       const escaped = msg.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       contentHtml = escaped;
     }
@@ -592,15 +684,11 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessagesContainer.appendChild(row);
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
 
-    // If on a different tab, show badge count and subtle toast
     if (activeTabName !== 'chat') {
       unreadChatCount++;
       if (chatBadge) {
         chatBadge.textContent = unreadChatCount;
         chatBadge.style.display = 'inline-block';
-      }
-      if (!isMe) {
-        showToast(`💬 ${msg.deviceName}: ${msg.text.substring(0, 35)}`);
       }
     }
   }
@@ -620,6 +708,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupControls() {
     btnPlay.addEventListener('click', async () => {
+      if (myRole === 'guest') {
+        showToast('🔒 Only Host can trigger playback');
+        return;
+      }
+
       await audioEngine.init();
       if (!currentTrack) return;
 
@@ -637,7 +730,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceType: 'youtube',
             youtubeVideoId: currentTrack.youtubeVideoId,
             position: ytPlayer && ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0,
-            leadTime: 300
+            leadTime: 800
           }));
         }
         return;
@@ -658,12 +751,17 @@ document.addEventListener('DOMContentLoaded', () => {
           trackId: currentTrack.id,
           position: pos,
           sourceType: 'audio',
-          leadTime: 300
+          leadTime: 800
         }));
       }
     });
 
     btnStop.addEventListener('click', () => {
+      if (myRole === 'guest') {
+        showToast('🔒 Only Host can control playback');
+        return;
+      }
+
       if (currentTrack && currentTrack.type === 'youtube') {
         if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
       } else {
@@ -679,6 +777,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     progressBar.addEventListener('click', (e) => {
+      if (myRole === 'guest') {
+        showToast('🔒 Playback position is controlled by Host');
+        return;
+      }
       if (!currentTrack) return;
       const rect = progressBar.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -691,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
           type: 'seek_cue',
           position: targetPos,
           sourceType: 'youtube',
-          leadTime: 250
+          leadTime: 600
         }));
       } else if (audioEngine.currentBuffer) {
         const targetPos = frac * audioEngine.currentBuffer.duration;
@@ -699,7 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
           type: 'seek_cue',
           position: targetPos,
           sourceType: 'audio',
-          leadTime: 250
+          leadTime: 600
         }));
       }
     });
@@ -708,15 +810,21 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.mode;
         setSpatialModeUi(mode);
-        ws.send(JSON.stringify({
-          type: 'set_spatial_mode',
-          spatialMode: mode
-        }));
+        if (myRole === 'host') {
+          ws.send(JSON.stringify({
+            type: 'set_spatial_mode',
+            spatialMode: mode
+          }));
+        }
       });
     });
 
     if (btnPrevTrack) {
       btnPrevTrack.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can change tracks');
+          return;
+        }
         if (tracks.length <= 1) return;
         let idx = tracks.findIndex(t => t.id === (currentTrack && currentTrack.id));
         idx = idx <= 0 ? tracks.length - 1 : idx - 1;
@@ -739,6 +847,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnNextTrack) {
       btnNextTrack.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can change tracks');
+          return;
+        }
         if (tracks.length <= 1) return;
         let idx = tracks.findIndex(t => t.id === (currentTrack && currentTrack.id));
         idx = (idx + 1) % tracks.length;
@@ -806,6 +918,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnUploadTrigger.addEventListener('click', () => fileUploadInput.click());
 
     fileUploadInput.addEventListener('change', async (e) => {
+      if (myRole === 'guest') {
+        showToast('🔒 Only Host can upload tracks');
+        return;
+      }
+
       const file = e.target.files[0];
       if (!file) return;
 
@@ -920,6 +1037,10 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       card.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can queue songs');
+          return;
+        }
         const autoplay = ytAutoplayCheckbox ? ytAutoplayCheckbox.checked : true;
         playCustomYouTubeVideo(item.id, item.title, autoplay);
       });
@@ -997,6 +1118,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setupCalibrator() {
+    if (btnAutoCalibrate) {
+      btnAutoCalibrate.addEventListener('click', async () => {
+        await audioEngine.init();
+        const delay = calibrator.autoCalibrate();
+        showToast(`⚡ Auto-Calibrated Output Delay: +${delay} ms`);
+      });
+    }
+
     calibrator.onFlash((isFlash) => {
       if (isFlash) {
         calibratorMarker.classList.add('pulse-hit');
@@ -1081,7 +1210,6 @@ document.addEventListener('DOMContentLoaded', () => {
     timeCurrent.textContent = '0:00';
     timeTotal.textContent = formatTime(track.duration || 0);
 
-    // Auto-detect & switch atmospheric mood particles
     if (atmosphereEngine) {
       const autoTheme = atmosphereEngine.detectThemeFromTitle(track.title);
       setAtmosphereTheme(autoTheme, false);
@@ -1112,6 +1240,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <span style="font-size:0.75rem; color:var(--text-tertiary); font-family:var(--font-mono);">${formatTime(track.duration || 0)}</span>
       `;
       capsule.addEventListener('click', async () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can switch tracks');
+          return;
+        }
         currentTrack = track;
         renderTrackShelf();
         updateTrackUi(currentTrack);
