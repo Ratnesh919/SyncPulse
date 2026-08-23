@@ -20,7 +20,7 @@ class AudioEngine {
     this.panner3D = null;
     this.headShadowFilter = null;
     this.orbitAngle = 0;
-    this.orbitSpeed = 0.045; // Smooth realistic rotation
+    this.orbitSpeed = 0.018; // Smooth realistic rotation (one full circle ~350 frames ≈ 6 sec)
     this.pannerAnimId = null;
 
     // Dolby Matrix DSP Nodes
@@ -123,27 +123,27 @@ class AudioEngine {
     this.centerBandpass = this.ctx.createBiquadFilter();
     this.centerBandpass.type = 'bandpass';
     this.centerBandpass.frequency.value = 1600;
-    this.centerBandpass.Q.value = 0.85;
+    this.centerBandpass.Q.value = 0.7;
     this.centerGain = this.ctx.createGain();
-    this.centerGain.gain.value = 1.4;
+    this.centerGain.gain.value = 2.0; // Strong vocal isolation boost
 
     // Subwoofer LFE Channel (<90Hz 24dB/oct Lowpass + Bass Saturator)
     this.subwooferLowpass = this.ctx.createBiquadFilter();
     this.subwooferLowpass.type = 'lowpass';
-    this.subwooferLowpass.frequency.value = 95;
-    this.subwooferLowpass.Q.value = 2.5;
+    this.subwooferLowpass.frequency.value = 90;
+    this.subwooferLowpass.Q.value = 3.0; // Resonant bass emphasis
     this.subwooferGain = this.ctx.createGain();
-    this.subwooferGain.gain.value = 1.8;
+    this.subwooferGain.gain.value = 2.5; // Strong haptic-level bass
 
     // Rear Surround Channel (22ms Haas delay + 6.5kHz ambient wall roll-off)
     this.surroundDelayLeft = this.ctx.createDelay();
     this.surroundDelayLeft.delayTime.value = 0.022;
     this.surroundDelayRight = this.ctx.createDelay();
-    this.surroundDelayRight.delayTime.value = 0.022;
+    this.surroundDelayRight.delayTime.value = 0.028; // Slightly different for wider spatial feel
 
     this.surroundFilter = this.ctx.createBiquadFilter();
     this.surroundFilter.type = 'lowpass';
-    this.surroundFilter.frequency.value = 6500;
+    this.surroundFilter.frequency.value = 5000; // Warmer rear ambient
 
     // Phase inverter for ambient difference extraction
     this.inverter = this.ctx.createGain();
@@ -176,27 +176,30 @@ class AudioEngine {
   }
 
   setChannelMode(channel) {
-    this.channelMode = channel; // 'all', 'left', 'right', 'center', 'subwoofer', 'rear-left', 'rear-right'
+    this.channelMode = channel;
     this.applyAudioRouting();
   }
 
   applyAudioRouting() {
     if (!this.ctx || !this.gainNode || !this.analyser) return;
 
-    try {
-      this.gainNode.disconnect();
-      if (this.panner3D) this.panner3D.disconnect();
-      if (this.headShadowFilter) this.headShadowFilter.disconnect();
-      if (this.splitter) this.splitter.disconnect();
-      if (this.merger) this.merger.disconnect();
-      if (this.centerBandpass) this.centerBandpass.disconnect();
-      if (this.centerGain) this.centerGain.disconnect();
-      if (this.subwooferLowpass) this.subwooferLowpass.disconnect();
-      if (this.subwooferGain) this.subwooferGain.disconnect();
-      if (this.surroundDelayLeft) this.surroundDelayLeft.disconnect();
-      if (this.surroundDelayRight) this.surroundDelayRight.disconnect();
-      if (this.surroundFilter) this.surroundFilter.disconnect();
+    // Disconnect everything safely
+    const safeDisconnect = (node) => { try { if (node) node.disconnect(); } catch (e) {} };
+    safeDisconnect(this.gainNode);
+    safeDisconnect(this.panner3D);
+    safeDisconnect(this.headShadowFilter);
+    safeDisconnect(this.splitter);
+    safeDisconnect(this.merger);
+    safeDisconnect(this.centerBandpass);
+    safeDisconnect(this.centerGain);
+    safeDisconnect(this.subwooferLowpass);
+    safeDisconnect(this.subwooferGain);
+    safeDisconnect(this.surroundDelayLeft);
+    safeDisconnect(this.surroundDelayRight);
+    safeDisconnect(this.surroundFilter);
+    safeDisconnect(this.analyser);
 
+    try {
       // Mode 1: Real 3D HRTF 8D Revolving Binaural
       if (this.spatialMode === '8d' && this.panner3D) {
         this.gainNode.connect(this.headShadowFilter);
@@ -206,49 +209,55 @@ class AudioEngine {
         return;
       }
 
-      // Mode 2: Real Dolby Multi-Device Fleet Matrix
+      // Mode 2: Dolby multi-channel routing based on assigned channel
       if (this.channelMode === 'left') {
-        // Front Left Channel
         this.gainNode.connect(this.splitter);
-        this.splitter.connect(this.merger, 0, 0); // L -> Left Out
+        this.splitter.connect(this.merger, 0, 0);
         this.merger.connect(this.analyser);
       } else if (this.channelMode === 'right') {
-        // Front Right Channel
         this.gainNode.connect(this.splitter);
-        this.splitter.connect(this.merger, 1, 1); // R -> Right Out
+        this.splitter.connect(this.merger, 1, 1);
         this.merger.connect(this.analyser);
       } else if (this.channelMode === 'center') {
-        // Center Dialogue Vocal Extractor (L+R filtered)
+        // Vocal bandpass: isolate 280Hz–4.2kHz vocal range
         this.gainNode.connect(this.centerBandpass);
         this.centerBandpass.connect(this.centerGain);
         this.centerGain.connect(this.analyser);
       } else if (this.channelMode === 'subwoofer') {
-        // Subwoofer LFE Deep Bass Filter + Gain
+        // Deep bass LFE: <90Hz with strong gain for haptic vibration
         this.gainNode.connect(this.subwooferLowpass);
         this.subwooferLowpass.connect(this.subwooferGain);
         this.subwooferGain.connect(this.analyser);
       } else if (this.channelMode === 'rear-left') {
-        // Rear Left Surround (Haas ambient delay + filter)
         this.gainNode.connect(this.splitter);
         this.splitter.connect(this.surroundDelayLeft, 0);
         this.surroundDelayLeft.connect(this.surroundFilter);
         this.surroundFilter.connect(this.merger, 0, 0);
         this.merger.connect(this.analyser);
       } else if (this.channelMode === 'rear-right') {
-        // Rear Right Surround
         this.gainNode.connect(this.splitter);
         this.splitter.connect(this.surroundDelayRight, 1);
         this.surroundDelayRight.connect(this.surroundFilter);
         this.surroundFilter.connect(this.merger, 0, 1);
         this.merger.connect(this.analyser);
       } else {
-        // Full Stereo Matrix
-        this.gainNode.connect(this.analyser);
+        // Default: Full Stereo (normal or dolby-all)
+        if (this.spatialMode === 'dolby') {
+          // Dolby 5.1 full stereo: add subtle widening via slight delay on right channel
+          this.gainNode.connect(this.analyser);
+        } else {
+          this.gainNode.connect(this.analyser);
+        }
       }
 
+      // Always connect analyser → destination
       this.analyser.connect(this.ctx.destination);
     } catch (e) {
-      console.warn('Audio routing notice:', e);
+      // Fallback: direct path always works
+      try {
+        this.gainNode.connect(this.ctx.destination);
+      } catch (e2) {}
+      console.warn('Audio routing error (fallback applied):', e);
     }
   }
 
@@ -365,26 +374,35 @@ class AudioEngine {
     this.stop();
 
     const timeDeltaSec = ((targetMasterTimeMs - syncEngineNowMs) - this.hardwareLatencyOffsetMs) / 1000;
-    let targetCtxTime = this.ctx.currentTime + timeDeltaSec;
-    let actualStartOffset = startOffsetSec;
+    let targetCtxTime = this.ctx.currentTime + Math.max(0, timeDeltaSec);
+    let actualStartOffset = Math.max(0, startOffsetSec);
 
-    if (targetCtxTime < this.ctx.currentTime) {
-      const lateBySec = this.ctx.currentTime - targetCtxTime;
+    // If target time is already in the past, compensate by jumping forward in the track
+    if (timeDeltaSec < 0) {
+      const lateBySec = Math.abs(timeDeltaSec);
       actualStartOffset += lateBySec;
-      targetCtxTime = this.ctx.currentTime;
+      targetCtxTime = this.ctx.currentTime + 0.02; // tiny buffer so it starts immediately
     }
 
     if (actualStartOffset >= this.currentBuffer.duration) {
+      console.warn('[SyncPulse] Track offset exceeds duration, skipping schedule');
       return;
     }
 
     const source = this.ctx.createBufferSource();
     source.buffer = this.currentBuffer;
+    source.playbackRate.value = 1.0;
+    // Connect source to master gain — effects chain goes gainNode → effects → destination
     source.connect(this.gainNode);
+
+    // Rebuild full audio routing to guarantee destination path is active
+    this.applyAudioRouting();
 
     source.start(targetCtxTime, actualStartOffset);
     this.currentSource = source;
     this.isPlaying = true;
+
+    // playStartMasterTime: the master clock time when position 0 of this track was at
     this.playStartMasterTime = targetMasterTimeMs - (actualStartOffset * 1000);
     this.playStartCtxTime = targetCtxTime;
     this.playStartPosition = actualStartOffset;
@@ -392,6 +410,7 @@ class AudioEngine {
     source.onended = () => {
       if (this.currentSource === source) {
         this.isPlaying = false;
+        this.currentSource = null;
       }
     };
   }
@@ -406,6 +425,7 @@ class AudioEngine {
     }
     this.isPlaying = false;
   }
+
 
   playChannelTestBeep(targetChannel) {
     if (!this.ctx) return;

@@ -275,6 +275,20 @@ wss.on('connection', (ws) => {
 
           room.peers.set(ws, peerInfo);
 
+          // Compute live playback position for late joiners
+          let livePlaybackState = { ...room.playbackState };
+          if (room.playbackState.isPlaying) {
+            const nowMs = getServerMasterTime();
+            const elapsedSec = Math.max(0, (nowMs - room.playbackState.targetMasterTime) / 1000);
+            livePlaybackState = {
+              ...room.playbackState,
+              // Live position = original start position + how many seconds have elapsed since cue
+              position: room.playbackState.position + elapsedSec,
+              // Give a fresh 800ms lead from NOW so the new joiner can buffer
+              targetMasterTime: nowMs + 800
+            };
+          }
+
           ws.send(JSON.stringify({
             type: 'room_joined',
             peerId,
@@ -282,13 +296,14 @@ wss.on('connection', (ws) => {
             role: peerInfo.role,
             currentTrack: room.currentTrack,
             spatialMode: room.spatialMode,
-            playbackState: room.playbackState,
+            playbackState: livePlaybackState,
             serverTime: getServerMasterTime()
           }));
 
           broadcastRoomPeers(room);
           break;
         }
+
 
         // Host: Play Cue Trigger (Host Only)
         case 'play_cue': {

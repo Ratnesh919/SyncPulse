@@ -505,34 +505,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (msg.spatialMode) {
           setSpatialModeUi(msg.spatialMode);
+          audioEngine.setSpatialMode(msg.spatialMode);
         }
+
         if (msg.currentTrack) {
           currentTrack = msg.currentTrack;
           updateTrackUi(currentTrack);
-          if (currentTrack.url) {
-            audioEngine.loadTrack(currentTrack.url).catch(() => {});
-          }
         }
-        if (msg.playbackState) {
+
+        if (msg.playbackState && msg.playbackState.isPlaying && currentTrack) {
           pendingPlaybackState = msg.playbackState;
-          if (msg.playbackState.isPlaying) {
-            if (audioEngine.ctx) {
-              if (msg.playbackState.sourceType === 'youtube') {
-                handleYouTubePlayCue(msg.playbackState.youtubeVideoId, msg.playbackState.position);
-              } else if (currentTrack && currentTrack.type === 'audio') {
-                audioEngine.loadTrack(currentTrack.url).then(() => {
-                  audioEngine.schedulePlayback(
-                    msg.playbackState.targetMasterTime,
-                    syncEngine ? syncEngine.now() : performance.now(),
-                    msg.playbackState.position
-                  );
-                  setPlayButtonState(true);
-                });
-              }
-            }
+
+          const ps = msg.playbackState;
+          if (ps.sourceType === 'youtube' || (currentTrack.type === 'youtube')) {
+            // YouTube: hand off to YouTube handler with current position
+            handleYouTubePlayCue(
+              ps.youtubeVideoId || currentTrack.youtubeVideoId,
+              ps.position || 0
+            );
+          } else if (currentTrack.url) {
+            // Audio file: must init audio engine FIRST, then load track, then schedule
+            audioEngine.init().then(() => {
+              return audioEngine.loadTrack(currentTrack.url);
+            }).then(() => {
+              // Server computed a fresh targetMasterTime (now + 800ms) and live position
+              audioEngine.schedulePlayback(
+                ps.targetMasterTime,
+                syncEngine ? syncEngine.now() : performance.now(),
+                Math.max(0, ps.position || 0)
+              );
+              setPlayButtonState(true);
+            }).catch(err => console.warn('[SyncPulse] Late-join audio load error:', err));
           }
         }
         break;
+
 
       case 'play_cue':
         currentTrack = msg.track;
