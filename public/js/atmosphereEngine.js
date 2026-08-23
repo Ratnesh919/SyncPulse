@@ -70,15 +70,53 @@ class AtmosphereEngine {
     this.applyThemeColors(themeName);
   }
 
+  detectThemeAndMood(title, artist = '') {
+    const text = `${title || ''} ${artist || ''}`.toLowerCase();
+
+    // 1. Rain / Monsoon / Baarish
+    if (/\b(barsaat|baarish|barish|rain|rainy|monsoon|rimjhim|boond|boondein|water|badal|drizzle|cloud|megha|sawan|saawan|barkha|tip tip)\b/i.test(text) ||
+        text.includes('barsaat') || text.includes('baarish') || text.includes('barish') || text.includes('rain')) {
+      return { theme: 'rain', moodName: '🌧️ Baarish / Rain', keyword: 'Baarish' };
+    }
+
+    // 2. Romantic / Love / Dil / Ishq
+    if (/\b(romantic|romance|love|pyar|pyaar|dil|ishq|mohabbat|deewana|sanam|janam|jaan|humsafar|darshan raval|arijit|kesariya|shayari|valentine|crush|kiss|couple|terey bina|tum hi ho|aashiqui|humraaz|pehle|pehla nasha|sweetheart|romantic)\b/i.test(text) ||
+        text.includes('romantic') || text.includes('love') || text.includes('ishq') || text.includes('pyaar') || text.includes('dil') || text.includes('darshan raval')) {
+      return { theme: 'hearts', moodName: '💖 Romantic / Love', keyword: 'Romantic' };
+    }
+
+    // 3. Sad / Melancholy / Heartbreak / Cold / Snow
+    if (/\b(sad|alone|lonely|tanha|dard|judaai|tuta dil|broken|heartbreak|cry|crying|tears|goodbye|alvida|channa mereya|bekhayali|bewafa|depressed|pain|dukh|gham|ghamgeen|snow|winter|ice|cold|frost|baraf|barf|frozen|glacier|christmas)\b/i.test(text) ||
+        text.includes('sad') || text.includes('lonely') || text.includes('dard') || text.includes('broken')) {
+      return { theme: 'snow', moodName: '❄️ Sad / Melancholy', keyword: 'Sad' };
+    }
+
+    // 4. Thunder / Storm / Heavy / Intense / Phonk
+    if (/\b(thunder|storm|lightning|bijli|toofan|thunderstorm|heavy|dark|rage|phonk|metal|hardcore|epic|battle|war|power|intense|drift|sigma|demon|danger|electric)\b/i.test(text)) {
+      return { theme: 'thunder', moodName: '⚡ Thunder / Heavy', keyword: 'Thunder' };
+    }
+
+    // 5. Fire / Sparks / Rock / Energy / Gym / Workout
+    if (/\b(fire|sparks|spark|flame|aag|jalwa|josh|rock|guitar|energy|hype|workout|gym|motivation|beast|ignite|blaze|heat|burn|sholay|dhamaka)\b/i.test(text)) {
+      return { theme: 'sparks', moodName: '🔥 High Energy / Sparks', keyword: 'Energy' };
+    }
+
+    // 6. Equalizer / EDM / Club / Bass / Party
+    if (/\b(equalizer|eq|bass|drop|edm|club|electro|party|trap|remix|dj|mashup|dance|house|techno|rave|disco|festival|bounce|dubstep|hardstyle|banger)\b/i.test(text)) {
+      return { theme: 'equalizer', moodName: '📊 EDM / Bass Booster', keyword: 'EDM / Bass' };
+    }
+
+    // 7. Stars / Lofi / Cosmic / Chill / Night
+    if (/\b(night|star|stars|sky|moon|chand|raat|cosmic|space|galaxy|lofi|lo-fi|chill|sleep|relax|dream|midnight|slowed|reverb|peace|meditation|ambient|aesthetic|sunset)\b/i.test(text)) {
+      return { theme: 'stars', moodName: '✨ Cosmic / Lofi Stars', keyword: 'Cosmic / Lofi' };
+    }
+
+    // Default Fallback
+    return { theme: 'stars', moodName: '✨ Cosmic Stars', keyword: 'Ambient' };
+  }
+
   detectThemeFromTitle(title) {
-    const t = (title || '').toLowerCase();
-    if (/thunder|storm|lightning|bijli|toofan|thunderstorm|heavy|dark/i.test(t)) return 'thunder';
-    if (/snow|winter|ice|cold|frost|baraf|barf|christmas|frozen|glacier/i.test(t)) return 'snow';
-    if (/barsaat|barish|rain|rainy|monsoon|water|drop|baarish/i.test(t)) return 'rain';
-    if (/love|heart|dil|ishq|pyar|pyaar|romance|darshan raval|sanam|janam|romantic/i.test(t)) return 'hearts';
-    if (/equalizer|eq|bass|drop|edm|club|electro|party|trap|remix|dj/i.test(t)) return 'equalizer';
-    if (/night|star|sky|moon|dream|lofi|lo-fi|chill|space|galaxy|midnight/i.test(t)) return 'stars';
-    return 'stars';
+    return this.detectThemeAndMood(title).theme;
   }
 
   applyThemeColors(theme) {
@@ -88,38 +126,46 @@ class AtmosphereEngine {
       root.style.setProperty('--neon-magenta', '#d0f0fd');
       root.style.setProperty('--bg-deep', '#030814');
       root.style.setProperty('--bg-base', '#061026');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(128, 212, 255, 0.25)');
     } else if (theme === 'thunder') {
       root.style.setProperty('--neon-cyan', '#a855f7');
       root.style.setProperty('--neon-magenta', '#00f2fe');
       root.style.setProperty('--bg-deep', '#020108');
       root.style.setProperty('--bg-base', '#090417');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(168, 85, 247, 0.25)');
     } else if (theme === 'equalizer') {
       root.style.setProperty('--neon-cyan', '#00f5a0');
       root.style.setProperty('--neon-magenta', '#ff007f');
       root.style.setProperty('--bg-deep', '#03060a');
       root.style.setProperty('--bg-base', '#070f1a');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(0, 245, 160, 0.25)');
     } else if (theme === 'rain') {
       root.style.setProperty('--neon-cyan', '#00f2fe');
-      root.style.setProperty('--neon-magenta', '#00c6ff');
+      root.style.setProperty('--neon-magenta', '#0088ff');
       root.style.setProperty('--bg-deep', '#020813');
       root.style.setProperty('--bg-base', '#040d1e');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(0, 242, 254, 0.25)');
     } else if (theme === 'hearts') {
       root.style.setProperty('--neon-cyan', '#ff2d75');
       root.style.setProperty('--neon-magenta', '#ff007f');
       root.style.setProperty('--bg-deep', '#0d0208');
       root.style.setProperty('--bg-base', '#16040e');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(255, 45, 117, 0.25)');
     } else if (theme === 'stars') {
       root.style.setProperty('--neon-cyan', '#a855f7');
       root.style.setProperty('--neon-magenta', '#00f2fe');
       root.style.setProperty('--bg-deep', '#04020a');
       root.style.setProperty('--bg-base', '#0a0518');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(168, 85, 247, 0.25)');
     } else if (theme === 'sparks') {
-      root.style.setProperty('--neon-cyan', '#00f0ff');
-      root.style.setProperty('--neon-magenta', '#ff007f');
-      root.style.setProperty('--bg-deep', '#030509');
-      root.style.setProperty('--bg-base', '#070a12');
+      root.style.setProperty('--neon-cyan', '#ff9900');
+      root.style.setProperty('--neon-magenta', '#ff3300');
+      root.style.setProperty('--bg-deep', '#0d0402');
+      root.style.setProperty('--bg-base', '#1a0804');
+      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(255, 153, 0, 0.25)');
     }
   }
+
 
   initParticles() {
     this.bgParticles = [];

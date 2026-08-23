@@ -224,6 +224,14 @@ body {
   font-weight: 700;
 }
 
+#btn-atmo-auto.active {
+  background: linear-gradient(135deg, #00f2fe, #ff007f);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.45);
+}
+
+
 .status-pill {
   display: flex;
   align-items: center;

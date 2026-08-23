@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const atmosphereUnderlay = document.getElementById('atmosphere-underlay');
   const atmosphereOverlay = document.getElementById('atmosphere-overlay');
   const floatingReactionsLayer = document.getElementById('screen-floating-reactions-layer');
+  const trackMoodBadge = document.getElementById('track-mood-badge');
 
   // Device Name Controls
   const btnEditDevice = document.getElementById('btn-edit-device');
@@ -213,6 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  let isAutoAtmosphere = true;
+  let manualSelectedTheme = null;
+
   function setupAtmosphere() {
     if (atmosphereUnderlay || atmosphereOverlay) {
       atmosphereEngine = new AtmosphereEngine(atmosphereUnderlay, atmosphereOverlay, audioEngine);
@@ -221,13 +225,50 @@ document.addEventListener('DOMContentLoaded', () => {
       atmoButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           const theme = btn.dataset.theme;
-          setAtmosphereTheme(theme, true);
+          if (theme === 'auto') {
+            isAutoAtmosphere = true;
+            manualSelectedTheme = null;
+            atmoButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            showToast('✨ Auto Mood-Sync Enabled: Theme automatically matches song keywords');
+            if (currentTrack) {
+              applyAutoAtmosphereForTrack(currentTrack, true);
+            }
+          } else {
+            isAutoAtmosphere = false;
+            manualSelectedTheme = theme;
+            setAtmosphereTheme(theme, true);
+          }
         });
       });
     }
   }
 
-  function setAtmosphereTheme(theme, showNotice = false) {
+  function applyAutoAtmosphereForTrack(track, showNotice = false) {
+    if (!atmosphereEngine || !track) return;
+    const moodResult = atmosphereEngine.detectThemeAndMood(track.title, track.artist);
+    
+    // Update track mood badge under billboard
+    if (trackMoodBadge) {
+      trackMoodBadge.textContent = `✨ Mood: ${moodResult.keyword}`;
+    }
+
+    if (isAutoAtmosphere) {
+      atmosphereEngine.setTheme(moodResult.theme);
+      atmoButtons.forEach(b => {
+        if (b.dataset.theme === 'auto') {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+      if (showNotice) {
+        showToast(`✨ Auto Mood-Sync: ${moodResult.moodName}`);
+      }
+    }
+  }
+
+  function setAtmosphereTheme(theme, isManual = false) {
     if (!atmosphereEngine) return;
     atmosphereEngine.setTheme(theme);
     atmoButtons.forEach(b => {
@@ -237,10 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
         b.classList.remove('active');
       }
     });
-    if (showNotice) {
-      showToast(`✨ Atmosphere: ${theme.toUpperCase()} MODE`);
+    if (isManual) {
+      showToast(`🎨 Theme Locked: ${theme.toUpperCase()} (Click "Auto Sync" to re-enable AI)`);
     }
   }
+
 
   function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1314,11 +1356,9 @@ document.addEventListener('DOMContentLoaded', () => {
     timeCurrent.textContent = '0:00';
     timeTotal.textContent = formatTime(track.duration || 0);
 
-    if (atmosphereEngine) {
-      const autoTheme = atmosphereEngine.detectThemeFromTitle(track.title);
-      setAtmosphereTheme(autoTheme, false);
-    }
+    applyAutoAtmosphereForTrack(track, false);
   }
+
 
   function setPlayButtonState(playing) {
     if (playing) {

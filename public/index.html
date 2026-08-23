@@ -42,14 +42,16 @@
       <!-- Atmospheric Theme Mood Selector -->
       <div class="atmosphere-picker">
         <span class="atmo-label">Atmosphere</span>
-        <button class="atmo-btn active" data-theme="snow" title="Drifting Snowflakes & Cold Mood">❄️ Snow</button>
-        <button class="atmo-btn" data-theme="thunder" title="Storm Lightning & Thunder Flashes">⚡ Thunder</button>
-        <button class="atmo-btn" data-theme="equalizer" title="Real-Time Ambient Equalizer Spectrum">📊 EQ Bars</button>
-        <button class="atmo-btn" data-theme="rain" title="Raindrops & Monsoon Mood">🌧️ Rain</button>
-        <button class="atmo-btn" data-theme="hearts" title="Floating Hearts & Romance">💖 Hearts</button>
-        <button class="atmo-btn" data-theme="stars" title="Twinkling Cosmic Stars">✨ Stars</button>
-        <button class="atmo-btn" data-theme="sparks" title="Cyberpunk High-Energy Sparks">🔥 Sparks</button>
+        <button id="btn-atmo-auto" class="atmo-btn active" data-theme="auto" title="✨ AI Auto-Detect theme based on currently playing song keywords">✨ Auto Sync</button>
+        <button class="atmo-btn" data-theme="rain" title="🌧️ Raindrops & Monsoon Mood (Baarish)">🌧️ Rain</button>
+        <button class="atmo-btn" data-theme="hearts" title="💖 Floating Hearts & Romance (Romantic)">💖 Hearts</button>
+        <button class="atmo-btn" data-theme="snow" title="❄️ Drifting Snowflakes & Sad/Melancholy Mood">❄️ Snow</button>
+        <button class="atmo-btn" data-theme="thunder" title="⚡ Storm Lightning & Heavy Bass Flashes">⚡ Thunder</button>
+        <button class="atmo-btn" data-theme="equalizer" title="📊 Real-Time Ambient Equalizer Spectrum">📊 EQ Bars</button>
+        <button class="atmo-btn" data-theme="stars" title="✨ Twinkling Cosmic Stars & Chill Lofi">✨ Stars</button>
+        <button class="atmo-btn" data-theme="sparks" title="🔥 High-Energy Sparks & Fire">🔥 Sparks</button>
       </div>
+
 
       <div class="header-telemetry-cluster">
         <!-- User Device Name Pill (Click to Rename) -->
@@ -161,8 +163,12 @@
                   <span class="pulse-beacon" style="width:5px; height:5px; background:var(--neon-cyan);"></span>
                   SYNCED STREAM
                 </span>
+                <span id="track-mood-badge" class="track-badge" style="background:rgba(0,242,254,0.1); border-color:var(--neon-cyan); color:var(--neon-cyan);">
+                  ✨ Mood: Cosmic
+                </span>
               </div>
             </div>
+
           </div>
 
           <!-- Guest Lock Notice (Hidden for Host) -->
