@@ -111,6 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const qrRoomCode = document.getElementById('qr-room-code');
   const btnCopyLink = document.getElementById('btn-copy-link');
 
+  // Host DJ Walkie-Talkie Mic & Banner Elements
+  const btnDjMic = document.getElementById('btn-dj-mic');
+  const djBroadcastBanner = document.getElementById('dj-broadcast-banner');
+  const djBannerText = document.getElementById('dj-banner-text');
+
+  // Equalizer & Acoustic FX Presets Elements
+  const toggleEq = document.getElementById('toggle-eq');
+  const eqPresetButtons = document.querySelectorAll('.eq-preset-btn');
+  const eqRackBox = document.querySelector('.eq-rack-box');
+
+
   // Core Engines
   let ws = null;
   let syncEngine = null;
@@ -134,6 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let ytPlayer = null;
   let isYtReady = false;
 
+  // Live Host DJ Walkie-Talkie Audio State
+  let djMediaRecorder = null;
+  let djMediaStream = null;
+  let isDjTalking = false;
+
   init();
 
   async function init() {
@@ -147,6 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupControls();
     setupYouTubeDesk();
     setupLiveChat();
+    setupDjMic();
+    setupEqualizerControls();
     
     // Parse URL room code
     const urlParams = new URLSearchParams(window.location.search);
@@ -713,8 +731,50 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast(`⚡ Host applied auto-calibration: ${msg.offsetMs > 0 ? '+' : ''}${Math.round(msg.offsetMs)} ms`);
         }
         break;
+
+      case 'dj_voice_start':
+        audioEngine.duckMusic(true);
+        if (djBroadcastBanner) {
+          djBroadcastBanner.style.display = 'flex';
+          if (djBannerText) {
+            djBannerText.textContent = `🎙️ ${msg.hostName || 'HOST DJ'} ON AIR — SPEAKING`;
+          }
+        }
+        break;
+
+      case 'dj_voice_chunk':
+        if (msg.audioData) {
+          audioEngine.playDjVoiceChunk(msg.audioData);
+        }
+        break;
+
+      case 'dj_voice_stop':
+        audioEngine.duckMusic(false);
+        if (djBroadcastBanner) {
+          djBroadcastBanner.style.display = 'none';
+        }
+        break;
+
+      case 'eq_preset_changed':
+        if (toggleEq) {
+          toggleEq.checked = !!msg.enabled;
+          if (eqRackBox) {
+            if (msg.enabled) eqRackBox.classList.remove('disabled');
+            else eqRackBox.classList.add('disabled');
+          }
+        }
+        if (msg.preset) {
+          eqPresetButtons.forEach(b => {
+            if (b.dataset.preset === msg.preset) b.classList.add('active');
+            else b.classList.remove('active');
+          });
+        }
+        audioEngine.setEqEnabled(msg.enabled);
+        if (msg.preset) audioEngine.setEqPreset(msg.preset);
+        break;
     }
   }
+
 
   function spawnRisingScreenReaction(msg) {
     if (!floatingReactionsLayer) return;
@@ -1057,6 +1117,153 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCalibrator();
     requestAnimationFrame(updatePlaybackProgress);
   }
+
+  function setupDjMic() {
+    if (!btnDjMic) return;
+
+    const startDjTalking = async (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      if (myRole === 'guest') {
+        showToast('🔒 Only Host can broadcast DJ live voice announcements');
+        return;
+      }
+      if (isDjTalking) return;
+
+      try {
+        await audioEngine.init();
+        djMediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        isDjTalking = true;
+        btnDjMic.classList.add('talking');
+        if (djBroadcastBanner) {
+          djBroadcastBanner.style.display = 'flex';
+          if (djBannerText) djBannerText.textContent = '🎙️ YOU ARE ON AIR — SPEAKING TO ALL DEVICES';
+        }
+
+        // Duck music locally
+        audioEngine.duckMusic(true);
+
+        // Notify room
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'dj_voice_start',
+            hostName: myDeviceName || 'Master Host DJ'
+          }));
+        }
+
+        // Capture voice in 120ms slices
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg');
+
+        djMediaRecorder = new MediaRecorder(djMediaStream, { mimeType });
+        djMediaRecorder.ondataavailable = async (ev) => {
+          if (ev.data && ev.data.size > 0 && isDjTalking) {
+            const arrayBuffer = await ev.data.arrayBuffer();
+            let binary = '';
+            const bytes = new Uint8Array(arrayBuffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'dj_voice_chunk',
+                audioData: base64
+              }));
+            }
+          }
+        };
+
+        djMediaRecorder.start(120);
+        showToast('🎙️ Live DJ Mic ON AIR: Music ducked across room');
+      } catch (err) {
+        console.warn('DJ Mic access error:', err);
+        showToast('⚠️ Microphone permission required for DJ Voice');
+        stopDjTalking();
+      }
+    };
+
+    const stopDjTalking = (e) => {
+      if (e && e.cancelable) e.preventDefault();
+      if (!isDjTalking) return;
+      isDjTalking = false;
+
+      btnDjMic.classList.remove('talking');
+      if (djBroadcastBanner) {
+        djBroadcastBanner.style.display = 'none';
+      }
+
+      // Restore music locally
+      audioEngine.duckMusic(false);
+
+      if (djMediaRecorder) {
+        try { djMediaRecorder.stop(); } catch (err) {}
+        djMediaRecorder = null;
+      }
+      if (djMediaStream) {
+        djMediaStream.getTracks().forEach(t => t.stop());
+        djMediaStream = null;
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'dj_voice_stop' }));
+      }
+      showToast('🎙️ DJ Mic Released: Music restored');
+    };
+
+    // Hold-to-Talk (Mouse / Touch)
+    btnDjMic.addEventListener('mousedown', startDjTalking);
+    window.addEventListener('mouseup', () => { if (isDjTalking) stopDjTalking(); });
+
+    btnDjMic.addEventListener('touchstart', (e) => { startDjTalking(e); }, { passive: false });
+    btnDjMic.addEventListener('touchend', (e) => { stopDjTalking(e); }, { passive: false });
+  }
+
+  function setupEqualizerControls() {
+    if (toggleEq) {
+      toggleEq.addEventListener('change', () => {
+        const enabled = toggleEq.checked;
+        audioEngine.setEqEnabled(enabled);
+        if (eqRackBox) {
+          if (enabled) eqRackBox.classList.remove('disabled');
+          else eqRackBox.classList.add('disabled');
+        }
+        showToast(enabled ? '🎛️ Equalizer DSP: ENABLED' : '🎛️ Equalizer DSP: BYPASSED (OFF)');
+        if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'set_eq_preset',
+            preset: audioEngine.currentEqPreset,
+            enabled: enabled
+          }));
+        }
+      });
+    }
+
+    eqPresetButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset;
+        eqPresetButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        audioEngine.setEqPreset(preset);
+        showToast(`🎛️ Preset Applied: ${btn.textContent.trim()}`);
+        if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'set_eq_preset',
+            preset: preset,
+            enabled: toggleEq ? toggleEq.checked : true
+          }));
+        }
+      });
+    });
+  }
+
 
   function setSpatialModeUi(mode) {
     currentSpatialMode = mode;

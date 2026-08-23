@@ -514,7 +514,57 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
+        // Host: Live Walkie-Talkie DJ Voice Start (Ducks music across all peers)
+        case 'dj_voice_start': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            broadcastToRoom(room, {
+              type: 'dj_voice_start',
+              hostName: msg.hostName || 'Master Host DJ'
+            }, ws);
+          }
+          break;
+        }
+
+        // Host: Live Walkie-Talkie DJ Voice Audio Chunk
+        case 'dj_voice_chunk': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            broadcastToRoom(room, {
+              type: 'dj_voice_chunk',
+              audioData: msg.audioData
+            }, ws);
+          }
+          break;
+        }
+
+        // Host: Live Walkie-Talkie DJ Voice Stop (Restores music volume across all peers)
+        case 'dj_voice_stop': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            broadcastToRoom(room, {
+              type: 'dj_voice_stop'
+            }, ws);
+          }
+          break;
+        }
+
+        // Host: Equalizer & Acoustic Preset Broadcast
+        case 'set_eq_preset': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            room.eqState = { preset: msg.preset, enabled: msg.enabled };
+            broadcastToRoom(room, {
+              type: 'eq_preset_changed',
+              preset: msg.preset,
+              enabled: msg.enabled
+            });
+          }
+          break;
+        }
       }
+
 
     } catch (err) {
       console.error('WebSocket Error:', err);

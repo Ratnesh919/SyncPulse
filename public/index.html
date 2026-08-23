@@ -22,6 +22,12 @@
   <!-- Google Meet-Style Rising Floating Messages & Reactions Screen Layer -->
   <div id="screen-floating-reactions-layer" class="screen-floating-reactions-layer"></div>
 
+  <!-- Live Host DJ Walkie-Talkie Floating Broadcast Banner -->
+  <div id="dj-broadcast-banner" class="dj-broadcast-banner" style="display:none;">
+    <div class="dj-live-beacon"></div>
+    <span id="dj-banner-text">🎙️ HOST DJ ON AIR — SPEAKING TO ALL DEVICES</span>
+  </div>
+
   <div class="app-wrapper">
     <!-- Master Header -->
     <header class="master-header">
@@ -192,6 +198,24 @@
             </div>
           </div>
 
+          <!-- 5-Band Equalizer & Acoustic FX Presets Rack -->
+          <div class="eq-rack-box">
+            <div class="eq-rack-header">
+              <span class="eq-rack-title">🎛️ Equalizer & Acoustic FX</span>
+              <label class="eq-toggle-label" title="Toggle Equalizer DSP On / Off">
+                <input type="checkbox" id="toggle-eq" checked>
+                <span class="eq-toggle-text">EQ ON</span>
+              </label>
+            </div>
+            <div class="eq-presets-row">
+              <button class="eq-preset-btn active" data-preset="bass_booster" title="Sub-Bass & Kick Boost (+9dB)">🔊 Bass Boost</button>
+              <button class="eq-preset-btn" data-preset="vocal_enhancer" title="Vocal Clarity & Presence (+6dB)">🎤 Vocal</button>
+              <button class="eq-preset-btn" data-preset="concert_hall" title="Lush Spatial Convolution Reverb">🏛️ Concert Hall</button>
+              <button class="eq-preset-btn" data-preset="edm" title="V-Shaped Bass & Crisp Highs">⚡ EDM</button>
+              <button class="eq-preset-btn" data-preset="flat" title="Flat Studio Reference (Neutral)">🎚️ Flat</button>
+            </div>
+          </div>
+
           <!-- Stereo VU Decibel Meters -->
           <div class="vu-cluster">
             <div class="vu-header-labels">
@@ -258,7 +282,17 @@
                 <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
               </svg>
             </button>
+            <!-- Host DJ Walkie-Talkie Push-to-Talk Mic -->
+            <button id="btn-dj-mic" class="btn-tactile-sm btn-dj-mic" title="🎙️ Host DJ Mic (Hold to Speak to All Devices)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
           </div>
+
 
           <!-- Master Volume & Sound Level -->
           <div class="volume-bar-box">

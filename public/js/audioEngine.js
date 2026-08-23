@@ -54,6 +54,22 @@ class AudioEngine {
       this.hardwareLatencyOffsetMs = parseFloat(savedDelay) || 0;
     }
 
+    // 5-Band Equalizer & Acoustic Presets
+    this.eqEnabled = true;
+    this.currentEqPreset = 'bass_booster';
+    this.eqSubBass = null;
+    this.eqLowMid = null;
+    this.eqMid = null;
+    this.eqHighMid = null;
+    this.eqTreble = null;
+    this.convolver = null;
+    this.reverbGain = null;
+    this.dryGain = null;
+
+    // DJ Voice Ducking & Direct Stream
+    this.duckingGainNode = null;
+    this.djVoiceGain = null;
+
     this.timeDomainBuffer = null;
     this.lastVibrateTime = 0;
     this.syncEngineRef = null;
@@ -71,9 +87,74 @@ class AudioEngine {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     this.ctx = new AudioContextClass({ latencyHint: 'interactive' });
     
-    // Master Gain
+    // Master Gain (Volume Control)
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.value = 0.85;
+
+    // Music Ducking Node (for Live DJ Voice Announcements)
+    this.duckingGainNode = this.ctx.createGain();
+    this.duckingGainNode.gain.value = 1.0;
+
+    // 5-Band Graphic Equalizer Filter Nodes
+    this.eqSubBass = this.ctx.createBiquadFilter();
+    this.eqSubBass.type = 'lowshelf';
+    this.eqSubBass.frequency.value = 65;
+    this.eqSubBass.gain.value = 0;
+
+    this.eqLowMid = this.ctx.createBiquadFilter();
+    this.eqLowMid.type = 'peaking';
+    this.eqLowMid.frequency.value = 250;
+    this.eqLowMid.Q.value = 1.0;
+    this.eqLowMid.gain.value = 0;
+
+    this.eqMid = this.ctx.createBiquadFilter();
+    this.eqMid.type = 'peaking';
+    this.eqMid.frequency.value = 1200;
+    this.eqMid.Q.value = 1.0;
+    this.eqMid.gain.value = 0;
+
+    this.eqHighMid = this.ctx.createBiquadFilter();
+    this.eqHighMid.type = 'peaking';
+    this.eqHighMid.frequency.value = 3500;
+    this.eqHighMid.Q.value = 1.0;
+    this.eqHighMid.gain.value = 0;
+
+    this.eqTreble = this.ctx.createBiquadFilter();
+    this.eqTreble.type = 'highshelf';
+    this.eqTreble.frequency.value = 11000;
+    this.eqTreble.gain.value = 0;
+
+    // Concert Hall Reverb Architecture (Synthesized Lush Impulse Response)
+    this.convolver = this.ctx.createConvolver();
+    this.convolver.buffer = this.createConcertHallImpulse(2.2, 2.0);
+    this.reverbGain = this.ctx.createGain();
+    this.reverbGain.gain.value = 0.0;
+    this.dryGain = this.ctx.createGain();
+    this.dryGain.gain.value = 1.0;
+
+    // Wire EQ Chain:
+    // duckingGainNode -> eqSubBass -> eqLowMid -> eqMid -> eqHighMid -> eqTreble
+    this.duckingGainNode.connect(this.eqSubBass);
+    this.eqSubBass.connect(this.eqLowMid);
+    this.eqLowMid.connect(this.eqMid);
+    this.eqMid.connect(this.eqHighMid);
+    this.eqHighMid.connect(this.eqTreble);
+
+    // eqTreble splits into Dry path and Convolver Reverb path -> gainNode
+    this.eqTreble.connect(this.dryGain);
+    this.dryGain.connect(this.gainNode);
+
+    this.eqTreble.connect(this.convolver);
+    this.convolver.connect(this.reverbGain);
+    this.reverbGain.connect(this.gainNode);
+
+    // Apply default EQ preset
+    this.setEqPreset(this.currentEqPreset);
+
+    // DJ Voice Stream Out Node (Directly to Destination with slight broadcast presence)
+    this.djVoiceGain = this.ctx.createGain();
+    this.djVoiceGain.gain.value = 1.5;
+    this.djVoiceGain.connect(this.ctx.destination);
 
     // Analyser Node
     this.analyser = this.ctx.createAnalyser();
@@ -158,6 +239,7 @@ class AudioEngine {
       await this.ctx.resume();
     }
   }
+
 
   autoCalibrateHardwareDelay() {
     if (!this.ctx) return 0;
@@ -393,8 +475,8 @@ class AudioEngine {
     const source = this.ctx.createBufferSource();
     source.buffer = this.currentBuffer;
     source.playbackRate.value = 1.0;
-    // Connect source to master gain — effects chain goes gainNode → effects → destination
-    source.connect(this.gainNode);
+    // Connect source to ducking node -> 5-band EQ -> Reverb -> Master gain -> Spatial routing -> Analyser -> Destination
+    source.connect(this.duckingGainNode || this.gainNode);
 
     // Rebuild full audio routing to guarantee destination path is active
     this.applyAudioRouting();
@@ -449,6 +531,108 @@ class AudioEngine {
     return Math.min(this.currentBuffer ? this.currentBuffer.duration : 0, (this.playStartPosition || 0) + elapsed);
   }
 
+  // Generate a lush stereo impulse response for Concert Hall Reverb
+  createConcertHallImpulse(duration = 2.2, decay = 2.0) {
+    if (!this.ctx) return null;
+    const rate = this.ctx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+
+    for (let i = 0; i < length; i++) {
+      const n = i / length;
+      const env = Math.pow(1 - n, decay);
+      left[i] = (Math.random() * 2 - 1) * env;
+      right[i] = (Math.random() * 2 - 1) * env;
+    }
+    return impulse;
+  }
+
+  applyEqGains(sub, lowMid, mid, highMid, treble, reverbWet = 0) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const ramp = (node, val) => {
+      if (node && node.gain) {
+        node.gain.cancelScheduledValues(now);
+        node.gain.setTargetAtTime(val, now, 0.05);
+      }
+    };
+    ramp(this.eqSubBass, sub);
+    ramp(this.eqLowMid, lowMid);
+    ramp(this.eqMid, mid);
+    ramp(this.eqHighMid, highMid);
+    ramp(this.eqTreble, treble);
+
+    if (this.reverbGain) {
+      this.reverbGain.gain.cancelScheduledValues(now);
+      this.reverbGain.gain.setTargetAtTime(reverbWet, now, 0.05);
+    }
+  }
+
+  setEqEnabled(enabled) {
+    this.eqEnabled = !!enabled;
+    if (!this.eqEnabled) {
+      this.applyEqGains(0, 0, 0, 0, 0, 0);
+    } else {
+      this.setEqPreset(this.currentEqPreset || 'bass_booster');
+    }
+  }
+
+  setEqPreset(presetName) {
+    this.currentEqPreset = presetName;
+    if (!this.eqEnabled) {
+      this.applyEqGains(0, 0, 0, 0, 0, 0);
+      return;
+    }
+    switch (presetName) {
+      case 'bass_booster':
+        this.applyEqGains(9.0, 4.0, 0.0, 0.0, 1.5, 0.0);
+        break;
+      case 'vocal_enhancer':
+        this.applyEqGains(-3.5, 0.0, 6.0, 5.0, 2.5, 0.06);
+        break;
+      case 'concert_hall':
+        this.applyEqGains(2.0, 2.0, 1.0, 3.0, 4.5, 0.42);
+        break;
+      case 'edm':
+        this.applyEqGains(8.5, -2.0, 1.0, 4.0, 7.0, 0.10);
+        break;
+      case 'flat':
+      default:
+        this.applyEqGains(0, 0, 0, 0, 0, 0);
+        break;
+    }
+  }
+
+  // Smoothly duck background music during Host DJ voiceover
+  duckMusic(shouldDuck) {
+    if (!this.duckingGainNode || !this.ctx) return;
+    const target = shouldDuck ? 0.20 : 1.0;
+    const now = this.ctx.currentTime;
+    this.duckingGainNode.gain.cancelScheduledValues(now);
+    this.duckingGainNode.gain.setTargetAtTime(target, now, shouldDuck ? 0.05 : 0.15);
+  }
+
+  // Direct DJ voice playback for receiving peers
+  async playDjVoiceChunk(base64Data) {
+    if (!this.ctx) await this.init();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    try {
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const audioBuffer = await this.ctx.decodeAudioData(bytes.buffer);
+      const src = this.ctx.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(this.djVoiceGain || this.ctx.destination);
+      src.start();
+    } catch (e) {
+      // Ignored for streaming frame artifacts
+    }
+  }
 
   playChannelTestBeep(targetChannel) {
     if (!this.ctx) return;
@@ -525,3 +709,4 @@ class AudioEngine {
 }
 
 window.AudioEngine = AudioEngine;
+
