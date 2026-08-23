@@ -171,20 +171,24 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
     await fetchServerInfo();
 
-    // Setup 3D visualizer
-    if (visualizerCanvas && window.THREE) {
-      visualizer3d = new Visualizer3D(visualizerCanvas, audioEngine);
-      visualizer3d.start();
+    // Setup 3D / 2D Canvas Visualizer
+    if (visualizerCanvas && window.Visualizer3D) {
+      try {
+        visualizer3d = new Visualizer3D(visualizerCanvas, audioEngine);
+        visualizer3d.start();
 
-      visButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          visButtons.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          const mode = btn.dataset.visMode;
-          visualizer3d.setMode(mode);
-          showToast(`🔮 3D Visualizer: ${mode.toUpperCase()}`);
+        visButtons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            visButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const mode = btn.dataset.visMode;
+            if (visualizer3d) visualizer3d.setMode(mode);
+            showToast(`🔮 3D Visualizer: ${mode.toUpperCase()}`);
+          });
         });
-      });
+      } catch (e) {
+        console.warn('Visualizer startup error:', e);
+      }
     }
 
     // Show initial join modal to unlock audio context on mobile & confirm device name
@@ -542,8 +546,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
       case 'play_cue':
-        currentTrack = msg.track;
-        updateTrackUi(currentTrack);
+        currentTrack = msg.track || currentTrack;
+        if (currentTrack) updateTrackUi(currentTrack);
         pendingPlaybackState = {
           isPlaying: true,
           position: msg.position,
@@ -551,43 +555,59 @@ document.addEventListener('DOMContentLoaded', () => {
           sourceType: msg.sourceType
         };
 
-        if (msg.sourceType === 'youtube') {
-          handleYouTubePlayCue(msg.youtubeVideoId, msg.position);
-        } else if (audioEngine.ctx) {
-          audioEngine.loadTrack(currentTrack.url).then(() => {
+        if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
+          handleYouTubePlayCue(msg.youtubeVideoId || (currentTrack && currentTrack.youtubeVideoId), msg.position);
+        } else if (currentTrack && currentTrack.url) {
+          audioEngine.init().then(() => {
+            return audioEngine.loadTrack(currentTrack.url);
+          }).then(() => {
             audioEngine.schedulePlayback(
               msg.targetMasterTime,
               syncEngine ? syncEngine.now() : performance.now(),
               msg.position
             );
             setPlayButtonState(true);
-          });
+          }).catch(err => console.warn('[SyncPulse] Play cue error:', err));
         }
         break;
 
       case 'pause_cue':
-        pendingPlaybackState = { isPlaying: false, position: msg.position };
-        if (msg.sourceType === 'youtube') {
+        pendingPlaybackState = { isPlaying: false, position: msg.position, sourceType: msg.sourceType };
+        if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
           if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
         } else {
-          audioEngine.stop();
+          audioEngine.pause(msg.position);
         }
         setPlayButtonState(false);
         break;
 
       case 'seek_cue':
-        if (msg.sourceType === 'youtube') {
+        pendingPlaybackState = {
+          isPlaying: msg.isPlaying,
+          position: msg.position,
+          targetMasterTime: msg.targetMasterTime,
+          sourceType: msg.sourceType
+        };
+        if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
           if (ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(msg.position, true);
-        } else if (audioEngine.ctx && msg.isPlaying) {
-          audioEngine.schedulePlayback(
-            msg.targetMasterTime,
-            syncEngine ? syncEngine.now() : performance.now(),
-            msg.position
-          );
-        } else {
-          audioEngine.playStartPosition = msg.position;
+        } else if (currentTrack && currentTrack.url) {
+          if (msg.isPlaying) {
+            audioEngine.init().then(() => {
+              return audioEngine.loadTrack(currentTrack.url);
+            }).then(() => {
+              audioEngine.schedulePlayback(
+                msg.targetMasterTime,
+                syncEngine ? syncEngine.now() : performance.now(),
+                msg.position
+              );
+              setPlayButtonState(true);
+            }).catch(err => console.warn('[SyncPulse] Seek error:', err));
+          } else {
+            audioEngine.pause(msg.position);
+          }
         }
         break;
+
 
       case 'track_changed':
         currentTrack = msg.track || currentTrack;
@@ -743,17 +763,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentTrack.type === 'youtube') {
         const isYtPlaying = ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 1;
         if (isYtPlaying) {
+          const ytPos = (ytPlayer && ytPlayer.getCurrentTime) ? ytPlayer.getCurrentTime() : 0;
           ws.send(JSON.stringify({
             type: 'pause_cue',
-            position: ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0,
+            position: ytPos,
             sourceType: 'youtube'
           }));
         } else {
+          const resumePos = (ytPlayer && ytPlayer.getCurrentTime)
+            ? ytPlayer.getCurrentTime()
+            : (pendingPlaybackState && typeof pendingPlaybackState.position === 'number' ? pendingPlaybackState.position : 0);
           ws.send(JSON.stringify({
             type: 'play_cue',
             sourceType: 'youtube',
             youtubeVideoId: currentTrack.youtubeVideoId,
-            position: ytPlayer && ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0,
+            position: resumePos,
             leadTime: 800
           }));
         }
@@ -762,18 +786,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (audioEngine.isPlaying) {
         const pos = audioEngine.getCurrentPlaybackPosition();
+        audioEngine.pause(pos);
         ws.send(JSON.stringify({
           type: 'pause_cue',
           position: pos,
           sourceType: 'audio'
         }));
       } else {
-        await audioEngine.loadTrack(currentTrack.url);
-        const pos = audioEngine.playStartPosition || 0;
+        if (currentTrack.url) {
+          await audioEngine.loadTrack(currentTrack.url);
+        }
+        const pos = (audioEngine.pausedPosition !== undefined)
+          ? audioEngine.pausedPosition
+          : ((pendingPlaybackState && typeof pendingPlaybackState.position === 'number') ? pendingPlaybackState.position : (audioEngine.playStartPosition || 0));
+
         ws.send(JSON.stringify({
           type: 'play_cue',
           trackId: currentTrack.id,
-          position: pos,
+          position: Math.max(0, pos),
           sourceType: 'audio',
           leadTime: 800
         }));
@@ -791,6 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         audioEngine.stop();
         audioEngine.playStartPosition = 0;
+        audioEngine.pausedPosition = 0;
       }
       ws.send(JSON.stringify({
         type: 'pause_cue',
@@ -799,6 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
       setPlayButtonState(false);
     });
+
 
     progressBar.addEventListener('click', (e) => {
       if (myRole === 'guest') {
@@ -1247,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
       progressFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
-    } else if (audioEngine.isPlaying && audioEngine.currentBuffer) {
+    } else if (audioEngine.currentBuffer) {
       const pos = audioEngine.getCurrentPlaybackPosition();
       const dur = audioEngine.currentBuffer.duration || 1;
       const pct = (pos / dur) * 100;
@@ -1255,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
     }
+
 
     if (vuBarLeft && vuBarRight) {
       const vu = audioEngine.getVuLevels();

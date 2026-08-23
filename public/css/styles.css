@@ -1769,11 +1769,12 @@ body {
     gap: 8px;
   }
 
-  /* Visualizer: collapsed height on phones */
+  /* Visualizer: optimal height on phones */
   .visualizer-viewport {
-    height: 180px;
+    height: 220px;
     border-radius: 10px;
   }
+
 
   .vis-mode-switch { gap: 4px; }
   .vis-btn-mini { font-size: 0.65rem; padding: 3px 7px; }

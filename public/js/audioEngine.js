@@ -372,6 +372,7 @@ class AudioEngine {
     if (!this.ctx || !this.currentBuffer) return;
 
     this.stop();
+    this.pausedPosition = undefined; // Clear paused position on new playback
 
     const timeDeltaSec = ((targetMasterTimeMs - syncEngineNowMs) - this.hardwareLatencyOffsetMs) / 1000;
     let targetCtxTime = this.ctx.currentTime + Math.max(0, timeDeltaSec);
@@ -415,6 +416,17 @@ class AudioEngine {
     };
   }
 
+  pause(pos) {
+    if (this.isPlaying) {
+      const currentPos = this.getCurrentPlaybackPosition();
+      this.pausedPosition = (typeof pos === 'number' && !isNaN(pos)) ? pos : currentPos;
+    } else if (typeof pos === 'number' && !isNaN(pos)) {
+      this.pausedPosition = pos;
+    }
+    this.playStartPosition = (this.pausedPosition !== undefined) ? this.pausedPosition : 0;
+    this.stop();
+  }
+
   stop() {
     if (this.currentSource) {
       try {
@@ -424,6 +436,17 @@ class AudioEngine {
       this.currentSource = null;
     }
     this.isPlaying = false;
+  }
+
+  getCurrentPlaybackPosition() {
+    if (!this.isPlaying || !this.ctx) {
+      return (typeof this.pausedPosition === 'number') ? this.pausedPosition : (this.playStartPosition || 0);
+    }
+    if (this.ctx.currentTime < this.playStartCtxTime) {
+      return this.playStartPosition || 0;
+    }
+    const elapsed = this.ctx.currentTime - this.playStartCtxTime;
+    return Math.min(this.currentBuffer ? this.currentBuffer.duration : 0, (this.playStartPosition || 0) + elapsed);
   }
 
 
@@ -451,15 +474,6 @@ class AudioEngine {
     if (targetChannel === 'subwoofer' && navigator.vibrate) {
       navigator.vibrate([100, 50, 100]);
     }
-  }
-
-  getCurrentPlaybackPosition() {
-    if (!this.isPlaying || !this.ctx) return this.playStartPosition;
-    if (this.ctx.currentTime < this.playStartCtxTime) {
-      return this.playStartPosition;
-    }
-    const elapsed = this.ctx.currentTime - this.playStartCtxTime;
-    return Math.min(this.currentBuffer ? this.currentBuffer.duration : 0, this.playStartPosition + elapsed);
   }
 
   getFrequencyData() {
