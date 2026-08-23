@@ -583,22 +583,24 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
 
       case 'track_changed':
-        currentTrack = msg.track;
+        currentTrack = msg.track || currentTrack;
+        if (!currentTrack) break;
         updateTrackUi(currentTrack);
         audioEngine.stop();
         setPlayButtonState(false);
-        if (currentTrack.type === 'youtube') {
+        if ((currentTrack.type || '') === 'youtube') {
           handleYouTubeTrackChange(currentTrack.youtubeVideoId, msg.autoplay);
-        } else if (audioEngine.ctx) {
+        } else if (currentTrack.url && audioEngine.ctx) {
           audioEngine.loadTrack(currentTrack.url).then(() => {
             if (msg.autoplay) {
               audioEngine.schedulePlayback(msg.targetMasterTime, syncEngine ? syncEngine.now() : performance.now(), 0);
               setPlayButtonState(true);
             }
-          });
+          }).catch(err => console.warn('Track load error:', err));
         }
         renderTrackShelf();
         break;
+
 
       case 'spatial_mode_changed':
         setSpatialModeUi(msg.spatialMode);
@@ -626,6 +628,21 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'chat_message':
         renderIncomingChatMessage(msg);
         spawnRisingScreenReaction(msg);
+        break;
+
+      case 'kicked':
+        showToast('⛔ You have been removed from this room by the host.');
+        setTimeout(() => {
+          window.location.href = window.location.pathname;
+        }, 2000);
+        break;
+
+      case 'apply_calibration':
+        // Host broadcast calibration offset to all guests
+        if (calibrator) {
+          calibrator.setOffset(msg.offsetMs);
+          showToast(`⚡ Host applied auto-calibration: ${msg.offsetMs > 0 ? '+' : ''}${Math.round(msg.offsetMs)} ms`);
+        }
         break;
     }
   }
@@ -973,9 +990,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setupYouTubeDesk() {
+    // Mark API as ready when YouTube iframe API loads
     window.onYouTubeIframeAPIReady = () => {
-      isYtReady = true;
-      initYouTubePlayer('CLeZyIID9Bo');
+      isYtReady = false; // will be true only after a player is created
+      // If there's already a pending YouTube track from the room, init it
+      if (currentTrack && currentTrack.type === 'youtube') {
+        initYouTubePlayer(currentTrack.youtubeVideoId);
+      }
     };
 
     btnYtSearch.addEventListener('click', (e) => {
@@ -1069,48 +1090,83 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(`▶ Queued YouTube: ${title}`);
   }
 
-  function initYouTubePlayer(videoId) {
-    if (!window.YT || !window.YT.Player) return;
-    ytPlayer = new YT.Player('youtube-player-container', {
-      height: '1',
-      width: '1',
+  function initYouTubePlayer(videoId, onReady) {
+    if (!window.YT || !window.YT.Player) {
+      // YT not loaded yet, retry
+      setTimeout(() => initYouTubePlayer(videoId, onReady), 300);
+      return;
+    }
+    // Destroy existing player
+    if (ytPlayer && ytPlayer.destroy) {
+      try { ytPlayer.destroy(); } catch (e) {}
+      ytPlayer = null;
+    }
+    isYtReady = false;
+    const container = document.getElementById('youtube-player-container');
+    if (!container) return;
+    container.innerHTML = '';
+    ytPlayer = new YT.Player(container, {
+      height: '0',
+      width: '0',
       videoId: videoId,
       playerVars: {
         playsinline: 1,
         controls: 0,
         disablekb: 1,
-        origin: window.location.origin
+        rel: 0,
+        fs: 0,
+        modestbranding: 1,
+        origin: window.location.origin,
+        enablejsapi: 1
       },
       events: {
-        onReady: () => { isYtReady = true; },
+        onReady: (e) => {
+          isYtReady = true;
+          if (onReady) onReady(e);
+        },
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.PLAYING) {
             setPlayButtonState(true);
           } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
             setPlayButtonState(false);
           }
+        },
+        onError: (e) => {
+          console.warn('YouTube player error:', e.data);
+          showToast('⚠️ YouTube video unavailable or region-blocked');
         }
       }
     });
   }
 
   function handleYouTubeTrackChange(videoId, autoplay) {
-    if (!ytPlayer) {
-      initYouTubePlayer(videoId);
-    } else if (ytPlayer.loadVideoById) {
+    if (!ytPlayer || !isYtReady) {
+      initYouTubePlayer(videoId, () => {
+        if (autoplay && ytPlayer && ytPlayer.playVideo) {
+          ytPlayer.playVideo();
+          setPlayButtonState(true);
+        }
+      });
+    } else {
       if (autoplay) {
-        ytPlayer.loadVideoById(videoId);
+        ytPlayer.loadVideoById({ videoId });
         setPlayButtonState(true);
       } else {
-        ytPlayer.cueVideoById(videoId);
+        ytPlayer.cueVideoById({ videoId });
       }
     }
   }
 
   function handleYouTubePlayCue(videoId, startPos) {
-    if (!ytPlayer) {
-      initYouTubePlayer(videoId);
-    } else if (ytPlayer.playVideo) {
+    if (!ytPlayer || !isYtReady) {
+      initYouTubePlayer(videoId, () => {
+        if (ytPlayer && ytPlayer.playVideo) {
+          if (startPos > 0) ytPlayer.seekTo(startPos, true);
+          ytPlayer.playVideo();
+          setPlayButtonState(true);
+        }
+      });
+    } else {
       if (startPos > 0) ytPlayer.seekTo(startPos, true);
       ytPlayer.playVideo();
       setPlayButtonState(true);
@@ -1123,6 +1179,14 @@ document.addEventListener('DOMContentLoaded', () => {
         await audioEngine.init();
         const delay = calibrator.autoCalibrate();
         showToast(`⚡ Auto-Calibrated Output Delay: +${delay} ms`);
+        // If host, broadcast to all peers
+        if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'broadcast_calibration',
+            offsetMs: delay
+          }));
+          showToast(`📡 Calibration sent to all ${deviceCountBadge.textContent}`);
+        }
       });
     }
 
@@ -1219,9 +1283,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function setPlayButtonState(playing) {
     if (playing) {
       btnPlay.classList.add('playing');
+      if (playIcon) playIcon.style.display = 'none';
+      if (pauseIcon) pauseIcon.style.display = '';
       if (vinylDisc) vinylDisc.classList.add('spinning');
     } else {
       btnPlay.classList.remove('playing');
+      if (playIcon) playIcon.style.display = '';
+      if (pauseIcon) pauseIcon.style.display = 'none';
       if (vinylDisc) vinylDisc.classList.remove('spinning');
     }
   }
@@ -1306,21 +1374,25 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        ${myRole === 'host' ? `
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px;">
-            <span style="font-size:0.7rem; color:var(--text-tertiary);">Dolby Position:</span>
-            <select class="remote-channel-select" data-peer-id="${peer.id}" style="background:#030509; border:1px solid var(--border-medium); color:#fff; border-radius:4px; font-size:0.75rem; padding:3px 6px;">
-              <option value="all" ${peer.channel === 'all' ? 'selected' : ''}>Full Stereo</option>
-              <option value="left" ${peer.channel === 'left' ? 'selected' : ''}>Front Left</option>
-              <option value="center" ${peer.channel === 'center' ? 'selected' : ''}>Center (Vocals)</option>
-              <option value="right" ${peer.channel === 'right' ? 'selected' : ''}>Front Right</option>
-              <option value="subwoofer" ${peer.channel === 'subwoofer' ? 'selected' : ''}>Subwoofer (Bass)</option>
-              <option value="rear-left" ${peer.channel === 'rear-left' ? 'selected' : ''}>Rear Left</option>
-              <option value="rear-right" ${peer.channel === 'rear-right' ? 'selected' : ''}>Rear Right</option>
-            </select>
+        ${myRole === 'host' && !isMe ? `
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px; flex:1;">
+              <span style="font-size:0.7rem; color:var(--text-tertiary); white-space:nowrap;">Dolby Ch:</span>
+              <select class="remote-channel-select" data-peer-id="${peer.id}" style="background:#030509; border:1px solid var(--border-medium); color:#fff; border-radius:4px; font-size:0.75rem; padding:3px 6px; flex:1;">
+                <option value="all" ${peer.channel === 'all' ? 'selected' : ''}>Full Stereo</option>
+                <option value="left" ${peer.channel === 'left' ? 'selected' : ''}>Front Left</option>
+                <option value="center" ${peer.channel === 'center' ? 'selected' : ''}>Center (Vocals)</option>
+                <option value="right" ${peer.channel === 'right' ? 'selected' : ''}>Front Right</option>
+                <option value="subwoofer" ${peer.channel === 'subwoofer' ? 'selected' : ''}>Subwoofer</option>
+                <option value="rear-left" ${peer.channel === 'rear-left' ? 'selected' : ''}>Rear Left</option>
+                <option value="rear-right" ${peer.channel === 'rear-right' ? 'selected' : ''}>Rear Right</option>
+              </select>
+            </div>
+            <button class="btn-kick-peer" data-peer-id="${peer.id}" style="background:rgba(255,51,102,0.15); border:1px solid rgba(255,51,102,0.4); color:var(--neon-red); border-radius:5px; padding:3px 8px; font-size:0.7rem; cursor:pointer; white-space:nowrap;">⛔ Kick</button>
           </div>
         ` : ''}
       `;
+
 
       fleetGrid.appendChild(card);
     });
@@ -1334,6 +1406,16 @@ document.addEventListener('DOMContentLoaded', () => {
           targetPeerId,
           channel: newChannel
         }));
+      });
+    });
+
+    document.querySelectorAll('.btn-kick-peer').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetPeerId = btn.dataset.peerId;
+        if (confirm('Remove this device from the room?')) {
+          ws.send(JSON.stringify({ type: 'kick_peer', targetPeerId }));
+          showToast('⛔ Device removed from room');
+        }
       });
     });
   }

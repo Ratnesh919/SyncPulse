@@ -250,6 +250,16 @@ wss.on('connection', (ws) => {
             room.hostWs = ws;
           }
 
+          // Evict stale connections from same device (by deviceName) to prevent ghost peers
+          if (deviceName) {
+            for (const [existingWs, existingPeer] of room.peers.entries()) {
+              if (existingWs !== ws && existingPeer.deviceName === deviceName) {
+                try { existingWs.terminate(); } catch (e) {}
+                room.peers.delete(existingWs);
+              }
+            }
+          }
+
           const peerInfo = {
             id: peerId,
             role: role || 'guest',
@@ -456,7 +466,41 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
+        // Host: Kick/Remove a peer device
+        case 'kick_peer': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            for (const [peerWs, peer] of room.peers.entries()) {
+              if (peer.id === msg.targetPeerId && peerWs !== ws) {
+                try {
+                  peerWs.send(JSON.stringify({ type: 'kicked', reason: 'Removed by host' }));
+                  peerWs.close();
+                } catch (e) {}
+                room.peers.delete(peerWs);
+                break;
+              }
+            }
+            broadcastRoomPeers(room);
+          }
+          break;
+        }
+
+        // Host: Broadcast auto-calibration offset to all peers
+        case 'broadcast_calibration': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            broadcastToRoom(room, {
+              type: 'apply_calibration',
+              offsetMs: msg.offsetMs,
+              source: 'host_auto',
+              serverTime: getServerMasterTime()
+            }, ws);
+          }
+          break;
+        }
       }
+
     } catch (err) {
       console.error('WebSocket Error:', err);
     }

@@ -39,6 +39,7 @@
   --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.4);
   --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
   --shadow-glow-cyan: 0 0 30px rgba(0, 242, 254, 0.25);
+  --shadow-glow-magenta: 0 0 30px rgba(255, 0, 127, 0.3);
 
   --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1678,4 +1679,212 @@ body {
     padding: 18px 14px;
     margin: 10px;
   }
+}
+/* Narrow portrait phone (9:16 aspect ratio - most phones) */
+@media (max-width: 430px) and (orientation: portrait), (max-width: 390px) {
+  html { font-size: 14px; }
+
+  .app-wrapper {
+    padding: 6px 8px 70px;
+    gap: 8px;
+  }
+
+  /* Header: stack vertically */
+  .master-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .brand-wrapper {
+    gap: 6px;
+  }
+
+  .brand-title { font-size: 1rem; }
+  .brand-tagline { font-size: 0.6rem; }
+
+  .atmosphere-picker {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 0;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+  .atmosphere-picker::-webkit-scrollbar { display: none; }
+  .atmo-btn { font-size: 0.65rem; padding: 3px 7px; white-space: nowrap; }
+
+  .header-telemetry-cluster {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-start;
+  }
+
+  .device-name-pill {
+    font-size: 0.65rem;
+    padding: 3px 7px;
+    max-width: 110px;
+  }
+
+  .status-pill {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+  }
+
+  #rtt-display { font-size: 0.62rem; }
+
+  .room-capsule {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+  }
+
+  #btn-open-join-modal,
+  #btn-share-qr {
+    font-size: 0.65rem;
+    padding: 4px 9px;
+  }
+
+  /* Nav dock - compact icon+text for phones */
+  .nav-dock {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-dock::-webkit-scrollbar { display: none; }
+
+  .dock-tab {
+    font-size: 0.65rem;
+    padding: 6px 8px;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .dock-tab svg { width: 14px; height: 14px; }
+
+  /* Studio panel: single column, tight gaps */
+  .studio-trio-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Visualizer: collapsed height on phones */
+  .visualizer-viewport {
+    height: 180px;
+    border-radius: 10px;
+  }
+
+  .vis-mode-switch { gap: 4px; }
+  .vis-btn-mini { font-size: 0.65rem; padding: 3px 7px; }
+
+  /* Console section full width */
+  .control-console {
+    height: auto;
+    min-height: unset;
+    padding: 12px;
+    gap: 10px;
+    border-radius: 10px;
+  }
+
+  /* Track billboard: compact */
+  .track-billboard { gap: 8px; flex-wrap: wrap; }
+  .vinyl-casing { width: 42px; height: 42px; flex-shrink: 0; }
+  .track-main-title { font-size: 0.85rem; line-height: 1.2; }
+  .track-artist-sub { font-size: 0.72rem; }
+
+  /* Spatial mode trio */
+  .spatial-mode-trio {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .mode-btn { font-size: 0.62rem; padding: 5px 2px; }
+
+  /* VU Meter row */
+  .vu-cluster { gap: 4px; }
+  .vu-meter-rack { height: 4px; }
+
+  /* Scrubber */
+  .playback-scrub-box { gap: 4px; }
+  .scrub-timestamps { font-size: 0.65rem; }
+
+  /* Transport buttons: tighter */
+  .transport-core {
+    gap: 5px;
+    justify-content: center;
+  }
+  .btn-tactile-sm { width: 32px; height: 32px; }
+  .btn-tactile.master-trigger { width: 50px; height: 50px; }
+
+  /* Volume bar */
+  .volume-bar-box { gap: 8px; }
+  .vol-percent-badge { font-size: 0.7rem; }
+
+  /* Mini YouTube panel: compact height */
+  .mini-youtube-panel {
+    height: auto;
+    max-height: 280px;
+    border-radius: 10px;
+  }
+  .yt-results-scroll { max-height: 200px; }
+  .yt-result-card { gap: 8px; padding: 8px 10px; }
+  .yt-thumb { width: 56px; height: 40px; }
+  .yt-video-title { font-size: 0.72rem; -webkit-line-clamp: 2; }
+  .yt-video-channel { font-size: 0.62rem; }
+
+  /* Fleet grid: single column */
+  #fleet-grid { grid-template-columns: 1fr !important; }
+
+  /* Chat */
+  .chat-workbench { border-radius: 10px; }
+  .chat-header-bar { padding: 10px 12px; }
+  .chat-messages-container { height: calc(100vh - 330px); }
+  .chat-input-bar { padding: 8px 10px; }
+  .chat-text-field { font-size: 0.8rem; }
+  .btn-send-chat { padding: 6px 10px; font-size: 0.8rem; }
+
+  /* Quick reactions: scrollable, compact */
+  .chat-quick-reactions { gap: 4px; padding: 6px 10px; }
+  .reaction-chip { font-size: 0.7rem; padding: 3px 7px; }
+
+  /* Rising reactions: on phone, smaller and on left */
+  .screen-floating-reactions-layer {
+    right: 8px;
+    width: 220px;
+    bottom: 80px;
+  }
+  .floating-screen-reaction-item { font-size: 0.75rem; padding: 6px 10px; }
+
+  /* Calibrator panel */
+  .calibrator-workbench { padding: 14px; }
+  .strobe-visual-arena { height: 140px !important; }
+  #offset-val-display { font-size: 1.4rem !important; }
+
+  /* Modals: full width on phones */
+  .modal-container {
+    margin: 8px;
+    padding: 16px 12px;
+    width: calc(100vw - 16px);
+    max-width: none;
+  }
+  .modal-title { font-size: 1rem; }
+
+  /* Track shelf: single column */
+  #track-list-container {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Guest lock banner */
+  .guest-lock-banner { font-size: 0.7rem; padding: 5px 10px; }
+}
+
+/* Landscape phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .master-header { padding: 5px 10px; }
+  .atmosphere-picker { display: none; }
+  .visualizer-viewport { height: 140px; }
+  .control-console { min-height: unset; }
+  .studio-trio-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mini-youtube-panel { height: 300px; }
 }
