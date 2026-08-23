@@ -252,11 +252,18 @@ body {
   color: var(--neon-amber);
 }
 
+.status-pill.locked {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: rgba(0, 242, 254, 0.45);
+  color: var(--neon-cyan);
+}
+
 .status-pill.disconnected {
   background: rgba(255, 51, 102, 0.08);
   border-color: rgba(255, 51, 102, 0.35);
   color: var(--neon-red);
 }
+
 
 .pulse-beacon {
   width: 7px;

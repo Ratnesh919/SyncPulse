@@ -279,12 +279,12 @@ wss.on('connection', (ws) => {
           let livePlaybackState = { ...room.playbackState };
           if (room.playbackState.isPlaying) {
             const nowMs = getServerMasterTime();
-            const elapsedSec = Math.max(0, (nowMs - room.playbackState.targetMasterTime) / 1000);
+            const roomMasterStart = room.playbackState.roomMasterStartTime || (room.playbackState.targetMasterTime - (room.playbackState.position * 1000));
+            const elapsedSec = Math.max(0, (nowMs - roomMasterStart) / 1000);
             livePlaybackState = {
               ...room.playbackState,
-              // Live position = original start position + how many seconds have elapsed since cue
-              position: room.playbackState.position + elapsedSec,
-              // Give a fresh 800ms lead from NOW so the new joiner can buffer
+              position: elapsedSec,
+              roomMasterStartTime: roomMasterStart,
               targetMasterTime: nowMs + 800
             };
           }
@@ -311,11 +311,13 @@ wss.on('connection', (ws) => {
           if (room && (room.hostWs === ws || msg.isHostOverride)) {
             const leadTime = msg.leadTime || 800;
             const targetMasterTime = getServerMasterTime() + leadTime;
+            const roomMasterStartTime = targetMasterTime - ((msg.position || 0) * 1000);
 
             room.playbackState = {
               isPlaying: true,
               position: msg.position || 0,
               targetMasterTime,
+              roomMasterStartTime,
               playbackRate: msg.playbackRate || 1.0,
               sourceType: msg.sourceType || 'audio',
               youtubeVideoId: msg.youtubeVideoId || null,
@@ -327,6 +329,7 @@ wss.on('connection', (ws) => {
               track: room.currentTrack,
               position: room.playbackState.position,
               targetMasterTime,
+              roomMasterStartTime,
               playbackRate: room.playbackState.playbackRate,
               sourceType: room.playbackState.sourceType,
               youtubeVideoId: room.playbackState.youtubeVideoId,
@@ -360,14 +363,17 @@ wss.on('connection', (ws) => {
           if (room && (room.hostWs === ws || msg.isHostOverride)) {
             const leadTime = msg.leadTime || 600;
             const targetMasterTime = getServerMasterTime() + leadTime;
+            const roomMasterStartTime = targetMasterTime - (msg.position * 1000);
             room.playbackState.position = msg.position;
             room.playbackState.targetMasterTime = targetMasterTime;
+            room.playbackState.roomMasterStartTime = roomMasterStartTime;
 
             broadcastToRoom(room, {
               type: 'seek_cue',
               position: msg.position,
               isPlaying: room.playbackState.isPlaying,
               targetMasterTime,
+              roomMasterStartTime,
               sourceType: room.playbackState.sourceType,
               serverTime: getServerMasterTime()
             });
@@ -387,18 +393,22 @@ wss.on('connection', (ws) => {
 
             const leadTime = 800;
             const targetMasterTime = getServerMasterTime() + leadTime;
+            const roomMasterStartTime = targetMasterTime;
             room.playbackState.targetMasterTime = targetMasterTime;
+            room.playbackState.roomMasterStartTime = roomMasterStartTime;
 
             broadcastToRoom(room, {
               type: 'track_changed',
               track: msg.track,
               autoplay: msg.autoplay || false,
               targetMasterTime,
+              roomMasterStartTime,
               serverTime: getServerMasterTime()
             });
           }
           break;
         }
+
 
         // Host: Set Spatial Sound Mode (Host Only)
         case 'set_spatial_mode': {
@@ -721,7 +731,27 @@ function createSynthesizedAudio(bpm, durationSec, style) {
 
 generateDemoWavs();
 
+// Periodic Room Master Sync Pulse (every 5 seconds)
+setInterval(() => {
+  const nowMs = getServerMasterTime();
+  for (const [roomId, room] of rooms.entries()) {
+    if (room.peers.size > 0 && room.playbackState && room.playbackState.isPlaying) {
+      const roomMasterStart = room.playbackState.roomMasterStartTime || (room.playbackState.targetMasterTime - (room.playbackState.position * 1000));
+      const elapsedSec = Math.max(0, (nowMs - roomMasterStart) / 1000);
+      broadcastToRoom(room, {
+        type: 'room_sync_pulse',
+        roomMasterStartTime: roomMasterStart,
+        isPlaying: room.playbackState.isPlaying,
+        position: elapsedSec,
+        currentTrack: room.currentTrack,
+        serverTime: nowMs
+      });
+    }
+  }
+}, 5000);
+
 server.listen(PORT, () => {
+
   console.log(`\n======================================================`);
   console.log(`🚀 SyncPulse Synchronized Spatial Audio Server Running!`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);

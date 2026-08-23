@@ -121,6 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const eqPresetButtons = document.querySelectorAll('.eq-preset-btn');
   const eqRackBox = document.querySelector('.eq-rack-box');
 
+  // Continuous Auto-Sync Elements
+  const autoSyncStatusBadge = document.getElementById('auto-sync-status-badge');
+  const autoSyncBadgeText = document.getElementById('auto-sync-badge-text');
+  const autoSyncLivePill = document.getElementById('auto-sync-live-pill');
+  const autoSyncDetailText = document.getElementById('auto-sync-detail-text');
+  const toggleAutoSync = document.getElementById('toggle-auto-sync');
+  const btnForceAutoSync = document.getElementById('btn-force-auto-sync');
+
+
 
   // Core Engines
   let ws = null;
@@ -577,6 +586,10 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTrackUi(currentTrack);
         }
 
+        if (msg.playbackState && msg.playbackState.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.playbackState.roomMasterStartTime);
+        }
+
         if (msg.playbackState && msg.playbackState.isPlaying && currentTrack) {
           pendingPlaybackState = msg.playbackState;
 
@@ -608,12 +621,16 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'play_cue':
         currentTrack = msg.track || currentTrack;
         if (currentTrack) updateTrackUi(currentTrack);
+        if (msg.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
+        }
         pendingPlaybackState = {
           isPlaying: true,
           position: msg.position,
           targetMasterTime: msg.targetMasterTime,
           sourceType: msg.sourceType
         };
+
 
         if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
           handleYouTubePlayCue(msg.youtubeVideoId || (currentTrack && currentTrack.youtubeVideoId), msg.position);
@@ -642,6 +659,9 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
 
       case 'seek_cue':
+        if (msg.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
+        }
         pendingPlaybackState = {
           isPlaying: msg.isPlaying,
           position: msg.position,
@@ -672,6 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'track_changed':
         currentTrack = msg.track || currentTrack;
         if (!currentTrack) break;
+        if (msg.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
+        }
         updateTrackUi(currentTrack);
         audioEngine.stop();
         setPlayButtonState(false);
@@ -688,6 +711,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTrackShelf();
         break;
 
+
+      case 'room_sync_pulse':
+        if (msg.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
+        }
+        if (currentTrack && currentTrack.type === 'youtube' && ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 1) {
+          const expectedYtPos = (syncEngine.now() - msg.roomMasterStartTime) / 1000;
+          const actualYtPos = (ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0);
+          const ytDrift = expectedYtPos - actualYtPos;
+          if (Math.abs(ytDrift) > 0.4) {
+            console.warn(`[SyncPulse YouTube Auto-Sync] Drift detected: ${Math.round(ytDrift * 1000)}ms. Resyncing...`);
+            ytPlayer.seekTo(expectedYtPos + 0.05, true);
+          }
+        }
+        break;
 
       case 'spatial_mode_changed':
         setSpatialModeUi(msg.spatialMode);
@@ -774,6 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
     }
   }
+
 
 
   function spawnRisingScreenReaction(msg) {
@@ -1518,7 +1557,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
     offsetSlider.value = calibrator.offsetMs;
     offsetValDisplay.textContent = `${calibrator.offsetMs > 0 ? '+' : ''}${Math.round(calibrator.offsetMs)} ms`;
+
+    // Wire Continuous Latency Auto-Corrector Listener (Checks & Fixes every 5s)
+    audioEngine.onAutoSyncStatus((status) => {
+      if (status.state === 'locked') {
+        if (autoSyncStatusBadge) {
+          autoSyncStatusBadge.className = 'status-pill';
+          if (autoSyncBadgeText) autoSyncBadgeText.textContent = `⚡ Synced (±${Math.abs(status.driftMs)}ms)`;
+        }
+        if (autoSyncLivePill) {
+          autoSyncLivePill.className = 'status-pill locked';
+          autoSyncLivePill.textContent = `Phase-Locked (±${Math.abs(status.driftMs)}ms)`;
+        }
+        if (autoSyncDetailText) {
+          autoSyncDetailText.textContent = `All devices in exact millisecond phase-lock! (Drift: ±${Math.abs(status.driftMs)}ms). 5-sec monitor active.`;
+        }
+      } else if (status.state === 'fixing') {
+        if (autoSyncStatusBadge) {
+          autoSyncStatusBadge.className = 'status-pill syncing';
+          if (autoSyncBadgeText) autoSyncBadgeText.textContent = `⚡ Auto-Fixing (${status.driftMs > 0 ? '+' : ''}${status.driftMs}ms)`;
+        }
+        if (autoSyncLivePill) {
+          autoSyncLivePill.className = 'status-pill syncing';
+          autoSyncLivePill.textContent = `Auto-Fixing (${status.driftMs > 0 ? '+' : ''}${status.driftMs}ms)`;
+        }
+        if (autoSyncDetailText) {
+          autoSyncDetailText.textContent = `Delay detected (${status.driftMs > 0 ? '+' : ''}${status.driftMs}ms on device). Automatically adjusting clock and phase...`;
+        }
+      } else if (status.state === 'disabled') {
+        if (autoSyncStatusBadge) {
+          autoSyncStatusBadge.className = 'status-pill disconnected';
+          if (autoSyncBadgeText) autoSyncBadgeText.textContent = 'Auto-Sync: OFF';
+        }
+        if (autoSyncLivePill) {
+          autoSyncLivePill.className = 'status-pill disconnected';
+          autoSyncLivePill.textContent = 'Auto-Sync: OFF';
+        }
+        if (autoSyncDetailText) {
+          autoSyncDetailText.textContent = 'Continuous auto-sync is paused. Tap "AUTO FIX: ON" to re-enable.';
+        }
+      }
+    });
+
+    if (toggleAutoSync) {
+      toggleAutoSync.addEventListener('change', () => {
+        const active = toggleAutoSync.checked;
+        audioEngine.setAutoSyncActive(active);
+        showToast(active ? '⚡ Continuous 5s Auto-Sync: ENABLED' : '⚡ Continuous Auto-Sync: DISABLED');
+      });
+    }
+
+    if (btnForceAutoSync) {
+      btnForceAutoSync.addEventListener('click', async () => {
+        await audioEngine.init();
+        audioEngine.forceAutoSyncNow();
+        showToast('⚡ Instant Auto-Sync Triggered: Re-aligning all devices...');
+      });
+    }
   }
+
 
   function updatePlaybackProgress() {
     if (currentTrack && currentTrack.type === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {

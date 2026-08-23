@@ -70,11 +70,21 @@ class AudioEngine {
     this.duckingGainNode = null;
     this.djVoiceGain = null;
 
+    // Continuous Latency Auto-Corrector & Phase-Lock Engine
+    this.roomMasterStartTime = 0;
+    this.autoSyncActive = true;
+    this.isAutoSyncFixing = false;
+    this.autoSyncConsecutiveLockedCount = 0;
+    this.lastDriftMs = 0;
+    this.onAutoSyncStatusCallback = null;
+    this.autoSyncIntervalTimer = null;
+
     this.timeDomainBuffer = null;
     this.lastVibrateTime = 0;
     this.syncEngineRef = null;
     this.driftGuardTimer = null;
   }
+
 
   async init() {
     if (this.ctx) {
@@ -375,41 +385,126 @@ class AudioEngine {
 
   setSyncEngine(syncEngine) {
     this.syncEngineRef = syncEngine;
+    this.startContinuousAutoSync();
   }
 
-  // Continuous Phase-Lock Drift Guard: Prevents audio drift across multiple devices
-  startDriftGuardLoop() {
-    if (this.driftGuardTimer) clearInterval(this.driftGuardTimer);
-    this.driftGuardTimer = setInterval(() => {
-      if (!this.isPlaying || !this.ctx || !this.syncEngineRef || !this.currentBuffer) return;
+  setRoomMasterStartTime(startTimeMs) {
+    if (typeof startTimeMs === 'number' && !isNaN(startTimeMs) && startTimeMs > 0) {
+      this.roomMasterStartTime = startTimeMs;
+      // If we're playing, check immediately to catch any initial drift
+      if (this.isPlaying) {
+        setTimeout(() => this.runAutoSyncCycle(), 150);
+      }
+    }
+  }
 
-      const masterNow = this.syncEngineRef.now();
-      const elapsedMasterSec = (masterNow - this.playStartMasterTime) / 1000;
-      const expectedPos = this.playStartPosition + elapsedMasterSec;
+  onAutoSyncStatus(callback) {
+    this.onAutoSyncStatusCallback = callback;
+  }
 
-      if (expectedPos >= this.currentBuffer.duration) return;
-
-      const currentActualPos = this.getCurrentPlaybackPosition();
-      const driftSec = expectedPos - currentActualPos;
-
-      // If drift is between 25ms and 150ms, subtly bend playback rate to phase-lock without clicks
-      if (Math.abs(driftSec) > 0.025 && Math.abs(driftSec) < 0.18 && this.currentSource) {
-        const rateCorrection = driftSec > 0 ? 1.015 : 0.985;
-        this.currentSource.playbackRate.setValueAtTime(rateCorrection, this.ctx.currentTime);
-      } else if (this.currentSource) {
+  setAutoSyncActive(active) {
+    this.autoSyncActive = !!active;
+    if (!this.autoSyncActive) {
+      if (this.currentSource && this.currentSource.playbackRate && this.ctx) {
         this.currentSource.playbackRate.setValueAtTime(1.0, this.ctx.currentTime);
       }
-
-      // If catastrophic drift > 200ms (e.g. background tab sleep), hard jump-resync
-      if (Math.abs(driftSec) > 0.22) {
-        console.warn(`[SyncPulse Phase-Lock] Drift detected: ${Math.round(driftSec * 1000)}ms. Resyncing...`);
-        this.schedulePlayback(
-          masterNow + 100,
-          masterNow,
-          Math.max(0, expectedPos + 0.1)
-        );
+      this.isAutoSyncFixing = false;
+      if (this.onAutoSyncStatusCallback) {
+        this.onAutoSyncStatusCallback({ state: 'disabled', driftMs: 0 });
       }
-    }, 600);
+    } else {
+      this.forceAutoSyncNow();
+    }
+  }
+
+  forceAutoSyncNow() {
+    this.autoSyncConsecutiveLockedCount = 0;
+    this.runAutoSyncCycle();
+  }
+
+  // Continuous Latency Auto-Corrector: Checks every 5 seconds and auto-fixes delay
+  startContinuousAutoSync() {
+    if (this.autoSyncIntervalTimer) clearInterval(this.autoSyncIntervalTimer);
+    this.autoSyncIntervalTimer = setInterval(() => {
+      this.runAutoSyncCycle();
+    }, 5000);
+  }
+
+  runAutoSyncCycle() {
+    if (!this.autoSyncActive || !this.isPlaying || !this.ctx || !this.syncEngineRef || !this.currentBuffer) {
+      return;
+    }
+
+    const masterNow = this.syncEngineRef.now();
+    const masterStart = this.roomMasterStartTime || this.playStartMasterTime;
+    if (!masterStart) return;
+
+    // Canonical room elapsed time
+    const roomElapsedSec = (masterNow - masterStart) / 1000;
+    if (roomElapsedSec < 0 || roomElapsedSec >= this.currentBuffer.duration) {
+      return;
+    }
+
+    // Local playback position
+    const localPos = this.getCurrentPlaybackPosition();
+
+    // Exact drift in milliseconds (taking hardware latency into account)
+    // Positive drift = local audio is behind room clock (needs speedup / jump forward)
+    // Negative drift = local audio is ahead of room clock (needs slowdown / jump back)
+    const rawDriftSec = roomElapsedSec - localPos;
+    const driftMs = Math.round((rawDriftSec * 1000) - this.hardwareLatencyOffsetMs);
+    this.lastDriftMs = driftMs;
+
+    // Phase-Locked Threshold: within ±15ms
+    if (Math.abs(driftMs) <= 15) {
+      this.autoSyncConsecutiveLockedCount++;
+      if (this.currentSource && this.currentSource.playbackRate) {
+        this.currentSource.playbackRate.setValueAtTime(1.0, this.ctx.currentTime);
+      }
+      // When locked for 2 consecutive cycles, stop active fixing
+      if (this.isAutoSyncFixing && this.autoSyncConsecutiveLockedCount >= 2) {
+        this.isAutoSyncFixing = false;
+      }
+
+      if (this.onAutoSyncStatusCallback) {
+        this.onAutoSyncStatusCallback({
+          state: 'locked',
+          driftMs,
+          isFixing: this.isAutoSyncFixing,
+          consecutive: this.autoSyncConsecutiveLockedCount
+        });
+      }
+      return;
+    }
+
+    // Delay / Drift Detected (> 15ms)!
+    this.isAutoSyncFixing = true;
+    this.autoSyncConsecutiveLockedCount = 0;
+
+    if (this.onAutoSyncStatusCallback) {
+      this.onAutoSyncStatusCallback({
+        state: 'fixing',
+        driftMs,
+        isFixing: true
+      });
+    }
+
+    // Case 1: Micro-Drift (15ms - 220ms) -> Seamless Dynamic Playback Rate Nudge
+    if (Math.abs(driftMs) <= 220 && this.currentSource && this.currentSource.playbackRate) {
+      const nudgeRate = driftMs > 0 ? 1.045 : 0.955;
+      this.currentSource.playbackRate.setValueAtTime(nudgeRate, this.ctx.currentTime);
+      console.log(`[SyncPulse Auto-Sync] Micro-nudge active: drift=${driftMs}ms, rate=${nudgeRate}`);
+    }
+    // Case 2: Macro-Delay (> 220ms, e.g. 3rd phone joined late or buffering lag) -> High-Precision Snap Resync
+    else {
+      console.warn(`[SyncPulse Auto-Sync] Macro-delay detected (${driftMs}ms on device). Executing instant snap-resync...`);
+      const leadTimeSec = 0.08;
+      this.schedulePlayback(
+        masterNow + (leadTimeSec * 1000),
+        masterNow,
+        Math.max(0, roomElapsedSec + leadTimeSec)
+      );
+    }
   }
 
   setHardwareLatencyOffset(ms) {
@@ -418,6 +513,7 @@ class AudioEngine {
   }
 
   setVolume(volume0to1) {
+
     if (this.gainNode && this.ctx) {
       this.gainNode.gain.setValueAtTime(Math.max(0, Math.min(1, volume0to1)), this.ctx.currentTime);
     }
