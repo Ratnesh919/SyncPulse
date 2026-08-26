@@ -104,11 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatOnlineCount = document.getElementById('chat-online-count');
   const reactionChips = document.querySelectorAll('.reaction-chip');
 
-  // Visualizer 3D Mode Buttons
-  const visButtons = document.querySelectorAll('.vis-btn-mini');
-  const visualizerCanvas = document.getElementById('visualizer-canvas');
-
   // Modals
+
   const modalArm = document.getElementById('modal-arm');
   const btnArmAudio = document.getElementById('btn-arm-audio');
   const modalQr = document.getElementById('modal-qr');
@@ -236,28 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
     await fetchServerInfo();
 
-    // Setup 3D / 2D Canvas Visualizer
-    if (visualizerCanvas && window.Visualizer3D) {
-      try {
-        visualizer3d = new Visualizer3D(visualizerCanvas, audioEngine);
-        visualizer3d.start();
-
-        visButtons.forEach(btn => {
-          btn.addEventListener('click', () => {
-            visButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const mode = btn.dataset.visMode;
-            if (visualizer3d) visualizer3d.setMode(mode);
-            showToast(`🔮 3D Visualizer: ${mode.toUpperCase()}`);
-          });
-        });
-      } catch (e) {
-        console.warn('Visualizer startup error:', e);
-      }
-    }
-
     // Show initial join modal to unlock audio context on mobile & confirm device name
     modalArm.classList.add('active');
+
   }
 
   function updateRoleUi() {

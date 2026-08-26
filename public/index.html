@@ -246,30 +246,10 @@
 
     <!-- Panel 1: Live Studio, 8D & YouTube -->
     <main id="panel-studio" class="tab-panel active">
-      <div class="studio-trio-grid">
-        <!-- 3D Visualizer Viewport -->
-        <section class="visualizer-viewport">
-          <div class="visualizer-hud">
-            <div class="hud-pill">
-              <span class="pulse-beacon" style="background:var(--neon-cyan);"></span>
-              <span>60 FPS • WebGL DSP</span>
-            </div>
-            <!-- 3D Mode Selector -->
-            <div class="vis-mode-switch">
-              <button class="vis-btn-mini active" data-vis-mode="sphere">Quantum</button>
-              <button class="vis-btn-mini" data-vis-mode="tunnel">Tunnel</button>
-              <button class="vis-btn-mini" data-vis-mode="bars">Towers</button>
-              <button class="vis-btn-mini" data-vis-mode="nebula">Nebula</button>
-            </div>
-          </div>
-          <div class="viewport-canvas-box">
-            <canvas id="visualizer-canvas"></canvas>
-          </div>
-        </section>
-
-
+      <div class="studio-duo-grid">
         <!-- Master Studio Console -->
         <section class="control-console">
+
           <!-- Top Track Billboard -->
           <div class="track-billboard">
             <div class="vinyl-casing">
@@ -846,7 +826,7 @@
   <script src="/js/syncEngine.js"></script>
   <script src="/js/audioEngine.js"></script>
   <script src="/js/latencyCalibrator.js"></script>
-  <script src="/js/visualizer3d.js"></script>
   <script src="/js/app.js"></script>
+
 </body>
 </html>

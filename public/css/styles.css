@@ -112,6 +112,8 @@ body {
 
 /* Master Header */
 .master-header {
+  position: relative;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -181,7 +183,7 @@ body {
 .theme-dropdown-container {
   position: relative;
   display: inline-block;
-  z-index: 1000;
+  z-index: 100000;
 }
 
 .theme-menu-btn {
@@ -234,21 +236,22 @@ body {
   top: calc(100% + 8px);
   left: 0;
   min-width: 270px;
-  background: rgba(11, 17, 32, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 242, 254, 0.3);
+  background: rgba(11, 17, 32, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 242, 254, 0.4);
   border-radius: var(--radius-md);
   padding: 6px;
   display: none;
   flex-direction: column;
   gap: 3px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 242, 254, 0.15);
-  z-index: 10000;
-  max-height: 420px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 242, 254, 0.25);
+  z-index: 100001;
+  max-height: 440px;
   overflow-y: auto;
   animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 
 @keyframes dropdownFadeIn {
   from { opacity: 0; transform: translateY(-6px); }
@@ -477,104 +480,21 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 3-Column Studio Grid */
-.studio-trio-grid {
+/* 2-Column Master Studio Grid */
+.studio-duo-grid {
   display: grid;
-  grid-template-columns: 1.15fr 0.95fr 0.9fr;
+  grid-template-columns: 1.35fr 1fr;
   gap: 16px;
+  align-items: start;
 }
 
-@media (max-width: 1100px) {
-  .studio-trio-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-@media (max-width: 768px) {
-  .studio-trio-grid {
+@media (max-width: 1024px) {
+  .studio-duo-grid {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 }
 
-/* 3D Visualizer Viewport */
-.visualizer-viewport {
-  position: relative;
-  height: 380px;
-  background: radial-gradient(circle at 50% 50%, #0b1120 0%, #030509 90%);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-elevated);
-  display: flex;
-  flex-direction: column;
-}
-
-.viewport-canvas-box {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-#visualizer-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.visualizer-hud {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-  right: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.hud-pill {
-  padding: 4px 10px;
-  background: rgba(3, 5, 9, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-full);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--neon-cyan);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  pointer-events: auto;
-}
-
-.vis-mode-switch {
-  display: flex;
-  gap: 3px;
-  background: rgba(3, 5, 9, 0.85);
-  padding: 3px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  pointer-events: auto;
-}
-
-.vis-btn-mini {
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: 0.68rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.vis-btn-mini.active {
-  background: var(--neon-cyan);
-  color: #000;
-  font-weight: 700;
-}
 
 /* Control Console */
 .control-console {
@@ -1834,11 +1754,9 @@ body {
   .app-wrapper {
     padding: 10px 12px 60px;
   }
-  .studio-trio-grid {
+  .studio-duo-grid {
     grid-template-columns: 1fr;
-  }
-  .visualizer-viewport {
-    height: 280px;
+    gap: 14px;
   }
   .control-console {
     height: auto;
@@ -1848,6 +1766,7 @@ body {
     height: 340px;
   }
 }
+
 
 @media (max-width: 768px) {
   .master-header {
@@ -1890,13 +1809,10 @@ body {
     padding: 8px 10px;
   }
 
-  .visualizer-viewport {
-    height: 240px;
-  }
-
   .track-billboard {
     gap: 10px;
   }
+
 
   .vinyl-casing {
     width: 44px;
@@ -2046,20 +1962,11 @@ body {
   .dock-tab svg { width: 14px; height: 14px; }
 
   /* Studio panel: single column, tight gaps */
-  .studio-trio-grid {
+  .studio-duo-grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
   }
 
-  /* Visualizer: optimal height on phones */
-  .visualizer-viewport {
-    height: 220px;
-    border-radius: 10px;
-  }
-
-
-  .vis-mode-switch { gap: 4px; }
-  .vis-btn-mini { font-size: 0.65rem; padding: 3px 7px; }
 
   /* Console section full width */
   .control-console {
@@ -2165,12 +2072,11 @@ body {
 /* Landscape phones */
 @media (max-height: 500px) and (orientation: landscape) {
   .master-header { padding: 5px 10px; }
-  .atmosphere-picker { display: none; }
-  .visualizer-viewport { height: 140px; }
   .control-console { min-height: unset; }
-  .studio-trio-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .studio-duo-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .mini-youtube-panel { height: 300px; }
 }
+
 
 /* ==========================================================================
    AUTO-DJ CROSSFADE, 24/7 RADIO STATIONS & DEMOCRATIC PARTY JUKEBOX

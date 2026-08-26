@@ -153,11 +153,11 @@ class AtmosphereEngine {
     if (this.currentTheme === 'sunny') {
       bgCount = 45; // Sunbeams & light glints
       fgCount = 30; // Floating dandelion fluffs / sun pollen
-      this.initSunnyClouds();
+      this.initRealisticClouds(true);
     } else if (this.currentTheme === 'moon') {
       bgCount = 50; // Night stars
       fgCount = 28; // Glowing fireflies
-      this.initClouds();
+      this.initRealisticClouds(false);
     } else if (this.currentTheme === 'sakura') {
       bgCount = 60; // Background sakura petals
       fgCount = 45; // Foreground sakura petals
@@ -192,92 +192,127 @@ class AtmosphereEngine {
     }
   }
 
-  initSunnyClouds() {
-    this.clouds = [
-      {
-        x: this.width * 0.08,
-        y: this.height * 0.14,
-        scale: 1.15,
-        speed: 0.18,
-        alpha: 0.88,
-        puffs: [
-          { dx: 0, dy: 0, r: 50 },
-          { dx: 40, dy: -15, r: 62 },
-          { dx: 86, dy: -8, r: 54 },
-          { dx: 130, dy: 6, r: 44 }
-        ]
-      },
-      {
-        x: this.width * 0.52,
-        y: this.height * 0.22,
-        scale: 1.35,
-        speed: 0.12,
-        alpha: 0.82,
-        puffs: [
-          { dx: 0, dy: 0, r: 55 },
-          { dx: 50, dy: -20, r: 72 },
-          { dx: 110, dy: -10, r: 62 },
-          { dx: 160, dy: 8, r: 50 }
-        ]
-      },
-      {
-        x: this.width * 0.32,
-        y: this.height * 0.08,
-        scale: 0.95,
-        speed: 0.22,
-        alpha: 0.7,
-        puffs: [
-          { dx: 0, dy: 0, r: 40 },
-          { dx: 34, dy: -12, r: 50 },
-          { dx: 72, dy: 2, r: 42 }
-        ]
-      }
+  initRealisticClouds(isDay) {
+    // 1. Deep Background Clouds (Drifting behind cards on underlay canvas)
+    this.bgClouds = [
+      this.createRealisticCloud(this.width * 0.05, this.height * 0.12, 1.25, 0.18, isDay ? 0.92 : 0.75, false),
+      this.createRealisticCloud(this.width * 0.55, this.height * 0.22, 1.45, 0.12, isDay ? 0.88 : 0.65, false),
+      this.createRealisticCloud(this.width * 0.32, this.height * 0.06, 1.05, 0.22, isDay ? 0.78 : 0.55, false)
+    ];
+
+    // 2. Foreground Wispy Clouds (Drifting ABOVE & ACROSS the cards on overlay canvas)
+    this.fgClouds = [
+      this.createRealisticCloud(this.width * 0.18, this.height * 0.05, 0.95, 0.26, isDay ? 0.36 : 0.26, true),
+      this.createRealisticCloud(this.width * 0.68, this.height * 0.16, 1.15, 0.15, isDay ? 0.30 : 0.22, true)
     ];
   }
 
+  createRealisticCloud(x, y, scale, speed, baseAlpha, isForeground) {
+    // 16 overlapping feathered billows creating organic cumulus structure with zero hard circular outlines
+    const puffs = [
+      // Base flat anchoring billows
+      { dx: -65, dy: 16, r: 52 },
+      { dx: -22, dy: 20, r: 64 },
+      { dx: 26, dy: 18, r: 68 },
+      { dx: 78, dy: 14, r: 58 },
+      { dx: 122, dy: 16, r: 48 },
 
-  initClouds() {
-    this.clouds = [
-      {
-        x: this.width * 0.15,
-        y: this.height * 0.12,
-        scale: 1.0,
-        speed: 0.18,
-        alpha: 0.7,
-        puffs: [
-          { dx: 0, dy: 0, r: 45 },
-          { dx: 35, dy: -12, r: 55 },
-          { dx: 75, dy: -6, r: 48 },
-          { dx: 115, dy: 4, r: 40 }
-        ]
-      },
-      {
-        x: this.width * 0.65,
-        y: this.height * 0.22,
-        scale: 1.25,
-        speed: 0.12,
-        alpha: 0.6,
-        puffs: [
-          { dx: 0, dy: 0, r: 50 },
-          { dx: 45, dy: -16, r: 65 },
-          { dx: 95, dy: -8, r: 55 },
-          { dx: 145, dy: 5, r: 45 }
-        ]
-      },
-      {
-        x: this.width * 0.45,
-        y: this.height * 0.08,
-        scale: 0.85,
-        speed: 0.22,
-        alpha: 0.5,
-        puffs: [
-          { dx: 0, dy: 0, r: 35 },
-          { dx: 30, dy: -10, r: 45 },
-          { dx: 65, dy: 0, r: 38 }
-        ]
-      }
+      // Central dense volumetric body
+      { dx: -45, dy: 0, r: 60 },
+      { dx: 0, dy: -6, r: 76 },
+      { dx: 46, dy: -2, r: 70 },
+      { dx: 92, dy: 2, r: 56 },
+
+      // Towering sunlit / moonlit crest billows
+      { dx: -25, dy: -26, r: 50 },
+      { dx: 16, dy: -36, r: 60 },
+      { dx: 56, dy: -24, r: 46 },
+      { dx: -62, dy: -12, r: 40 },
+
+      // Wispy trailing edge puffs
+      { dx: -98, dy: 10, r: 34 },
+      { dx: 146, dy: 12, r: 36 },
+      { dx: 168, dy: 16, r: 26 }
     ];
+
+    return {
+      x,
+      y,
+      scale,
+      speed,
+      baseAlpha,
+      isForeground,
+      puffs
+    };
   }
+
+  drawRealisticClouds(ctx, clouds, isDay, bassEnergy, isForeground) {
+    if (!clouds || !ctx) return;
+
+    for (let c = 0; c < clouds.length; c++) {
+      const cloud = clouds[c];
+      cloud.x += cloud.speed;
+
+      // Wrap smoothly around viewport
+      const totalWidth = 400 * cloud.scale;
+      if (cloud.x > this.width + totalWidth) {
+        cloud.x = -totalWidth;
+      }
+
+      const effAlpha = cloud.baseAlpha * (0.88 + bassEnergy * 0.12);
+
+      for (let i = 0; i < cloud.puffs.length; i++) {
+        const puff = cloud.puffs[i];
+        const px = cloud.x + puff.dx * cloud.scale;
+        const py = cloud.y + puff.dy * cloud.scale;
+        const pr = puff.r * cloud.scale * (1 + bassEnergy * 0.04);
+
+        // Light direction (Top right / sun / moon position)
+        const lx = px - pr * 0.22;
+        const ly = py - pr * 0.28;
+
+        const grad = ctx.createRadialGradient(lx, ly, pr * 0.05, px, py, pr);
+
+        if (isDay) {
+          if (!isForeground) {
+            // Background deep sunlit clouds
+            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.95})`);
+            grad.addColorStop(0.28, `rgba(255, 253, 242, ${effAlpha * 0.85})`);
+            grad.addColorStop(0.62, `rgba(225, 238, 252, ${effAlpha * 0.45})`);
+            grad.addColorStop(0.88, `rgba(205, 226, 248, ${effAlpha * 0.15})`);
+            grad.addColorStop(1, 'rgba(195, 220, 245, 0)');
+          } else {
+            // Foreground wispy clouds above cards
+            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.7})`);
+            grad.addColorStop(0.35, `rgba(255, 252, 245, ${effAlpha * 0.5})`);
+            grad.addColorStop(0.72, `rgba(230, 242, 255, ${effAlpha * 0.2})`);
+            grad.addColorStop(1, 'rgba(215, 235, 255, 0)');
+          }
+        } else {
+          if (!isForeground) {
+            // Background moonlit night clouds
+            grad.addColorStop(0, `rgba(235, 248, 255, ${effAlpha * 0.85})`);
+            grad.addColorStop(0.32, `rgba(185, 218, 252, ${effAlpha * 0.55})`);
+            grad.addColorStop(0.68, `rgba(130, 175, 225, ${effAlpha * 0.25})`);
+            grad.addColorStop(0.9, `rgba(90, 140, 200, ${effAlpha * 0.08})`);
+            grad.addColorStop(1, 'rgba(70, 110, 170, 0)');
+          } else {
+            // Foreground wispy moon clouds above cards
+            grad.addColorStop(0, `rgba(220, 242, 255, ${effAlpha * 0.55})`);
+            grad.addColorStop(0.4, `rgba(165, 210, 250, ${effAlpha * 0.3})`);
+            grad.addColorStop(0.78, `rgba(115, 165, 225, ${effAlpha * 0.1})`);
+            grad.addColorStop(1, 'rgba(80, 130, 190, 0)');
+          }
+        }
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
 
   createParticle(isBg) {
     if (this.currentTheme === 'sunny') {
@@ -1096,28 +1131,8 @@ class AtmosphereEngine {
       }
     }
 
-    // 3. Drifting Soft Clouds
-    if (this.clouds) {
-      for (let i = 0; i < this.clouds.length; i++) {
-        const c = this.clouds[i];
-        c.x += c.speed;
-        if (c.x > this.width + 250) c.x = -250;
-
-        this.uCtx.save();
-        this.uCtx.globalAlpha = c.alpha * (0.85 + bassEnergy * 0.15);
-        this.uCtx.fillStyle = 'rgba(195, 225, 255, 0.18)';
-        this.uCtx.shadowColor = 'rgba(180, 220, 255, 0.25)';
-        this.uCtx.shadowBlur = 18;
-
-        for (let j = 0; j < c.puffs.length; j++) {
-          const puff = c.puffs[j];
-          this.uCtx.beginPath();
-          this.uCtx.arc(c.x + puff.dx * c.scale, c.y + puff.dy * c.scale, puff.r * c.scale, 0, Math.PI * 2);
-          this.uCtx.fill();
-        }
-        this.uCtx.restore();
-      }
-    }
+    // 3. Realistic Drifting Volumetric Background Clouds
+    this.drawRealisticClouds(this.uCtx, this.bgClouds, false, bassEnergy, false);
 
     // 4. Moving Meadow Grass Blades (Influenced by slow soothing breeze)
     this.drawMeadowGrass(this.uCtx, time, bassEnergy, false);
@@ -1127,10 +1142,14 @@ class AtmosphereEngine {
   drawOverlayMoon(bassEnergy) {
     const time = performance.now();
 
-    // 1. Foreground Moving Grass Blades with Silvery Moonlight Sheen
+    // 1. Realistic Foreground Ethereal Wispy Clouds (Drifting Above/Across Cards)
+    this.drawRealisticClouds(this.oCtx, this.fgClouds, false, bassEnergy, true);
+
+    // 2. Foreground Moving Grass Blades with Silvery Moonlight Sheen
     this.drawMeadowGrass(this.oCtx, time, bassEnergy, true);
 
-    // 2. Glowing Fireflies / Meadow Light Motes
+    // 3. Glowing Fireflies / Meadow Light Motes
+
     for (let i = 0; i < this.fgParticles.length; i++) {
       const p = this.fgParticles[i];
       if (p.type === 'firefly') {
@@ -1323,28 +1342,8 @@ class AtmosphereEngine {
     this.uCtx.fill();
     this.uCtx.shadowBlur = 0;
 
-    // 2. Bright Sunlit White/Cream Daytime Clouds
-    if (this.clouds) {
-      for (let i = 0; i < this.clouds.length; i++) {
-        const c = this.clouds[i];
-        c.x += c.speed;
-        if (c.x > this.width + 300) c.x = -300;
-
-        this.uCtx.save();
-        this.uCtx.globalAlpha = c.alpha * (0.88 + bassEnergy * 0.12);
-        this.uCtx.fillStyle = 'rgba(255, 255, 255, 0.32)';
-        this.uCtx.shadowColor = 'rgba(255, 248, 220, 0.4)';
-        this.uCtx.shadowBlur = 20;
-
-        for (let j = 0; j < c.puffs.length; j++) {
-          const puff = c.puffs[j];
-          this.uCtx.beginPath();
-          this.uCtx.arc(c.x + puff.dx * c.scale, c.y + puff.dy * c.scale, puff.r * c.scale, 0, Math.PI * 2);
-          this.uCtx.fill();
-        }
-        this.uCtx.restore();
-      }
-    }
+    // 2. Realistic Drifting Volumetric Background Clouds
+    this.drawRealisticClouds(this.uCtx, this.bgClouds, true, bassEnergy, false);
 
     // 3. Background Sunlit Emerald Grass Meadow
     this.drawSunnyMeadowGrass(this.uCtx, time, bassEnergy, false);
@@ -1354,10 +1353,14 @@ class AtmosphereEngine {
   drawOverlaySunny(bassEnergy) {
     const time = performance.now();
 
-    // 1. Foreground Sunlit Emerald/Lime Grass Blades
+    // 1. Realistic Foreground Ethereal Wispy Clouds (Drifting Above/Across Cards)
+    this.drawRealisticClouds(this.oCtx, this.fgClouds, true, bassEnergy, true);
+
+    // 2. Foreground Sunlit Emerald/Lime Grass Blades
     this.drawSunnyMeadowGrass(this.oCtx, time, bassEnergy, true);
 
-    // 2. Floating Golden Dandelion Spores & Sunlit Pollen Motes
+    // 3. Floating Golden Dandelion Spores & Sunlit Pollen Motes
+
     for (let i = 0; i < this.fgParticles.length; i++) {
       const p = this.fgParticles[i];
       if (p.type === 'dandelion') {
