@@ -1170,25 +1170,45 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('🔒 Only Host can change tracks');
           return;
         }
-        if (tracks.length <= 1) return;
-        let idx = tracks.findIndex(t => t.id === (currentTrack && currentTrack.id));
-        idx = (idx + 1) % tracks.length;
-        const nextTrack = tracks[idx];
-        currentTrack = nextTrack;
-        renderTrackShelf();
-        updateTrackUi(currentTrack);
-        if (currentTrack.type === 'youtube') {
-          handleYouTubeTrackChange(currentTrack.youtubeVideoId, true);
-        } else {
-          audioEngine.loadTrack(currentTrack.url);
+
+        // Priority 1: Play next top-voted song from Collaborative Jukebox Queue
+        if (currentQueue && currentQueue.length > 0) {
+          const nextTrackTitle = currentQueue[0].track ? currentQueue[0].track.title : 'Next Song';
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_pop_next',
+              crossfadeSec: crossfadeDuration
+            }));
+            showToast(`⏭️ Playing Next from Queue: "${nextTrackTitle}"`);
+          }
+          return;
         }
-        ws.send(JSON.stringify({
-          type: 'change_track',
-          track: currentTrack,
-          autoplay: true
-        }));
+
+        // Priority 2: Fallback to cycling preset library tracks if queue is empty
+        if (tracks.length > 1) {
+          let idx = tracks.findIndex(t => t.id === (currentTrack && currentTrack.id));
+          idx = (idx + 1) % tracks.length;
+          const nextTrack = tracks[idx];
+          currentTrack = nextTrack;
+          renderTrackShelf();
+          updateTrackUi(currentTrack);
+          if (currentTrack.type === 'youtube') {
+            handleYouTubeTrackChange(currentTrack.youtubeVideoId, true);
+          } else {
+            audioEngine.loadTrack(currentTrack.url);
+          }
+          ws.send(JSON.stringify({
+            type: 'change_track',
+            track: currentTrack,
+            autoplay: true
+          }));
+          showToast(`⏭️ Playing: "${nextTrack.title}"`);
+        } else {
+          showToast('🗳️ Queue is empty. Search YouTube or tap "+ Queue" to add songs!');
+        }
       });
     }
+
 
     let isLooping = false;
     if (btnLoopToggle) {
@@ -1580,10 +1600,22 @@ document.addEventListener('DOMContentLoaded', () => {
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.PLAYING) {
             setPlayButtonState(true);
-          } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+          } else if (event.data === YT.PlayerState.PAUSED) {
             setPlayButtonState(false);
+          } else if (event.data === YT.PlayerState.ENDED) {
+            setPlayButtonState(false);
+            if (myRole === 'host' && currentQueue && currentQueue.length > 0) {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'queue_pop_next',
+                  crossfadeSec: crossfadeDuration,
+                  isAutoTransition: true
+                }));
+              }
+            }
           }
         },
+
         onError: (e) => {
           console.warn('YouTube player error:', e.data);
           showToast('⚠️ YouTube video unavailable or region-blocked');
