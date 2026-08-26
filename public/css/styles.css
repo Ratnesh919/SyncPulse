@@ -2494,3 +2494,117 @@ body {
   color: #030509;
 }
 
+/* Up Next in Queue Live Banner */
+.up-next-banner {
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(121, 40, 202, 0.08));
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: all var(--transition-normal);
+  animation: pulseGlowSubtle 3s infinite alternate ease-in-out;
+}
+
+@keyframes pulseGlowSubtle {
+  0% { border-color: rgba(0, 242, 254, 0.25); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+  100% { border-color: rgba(0, 242, 254, 0.45); box-shadow: 0 4px 20px rgba(0, 242, 254, 0.12); }
+}
+
+.up-next-banner:hover {
+  border-color: rgba(0, 242, 254, 0.55);
+}
+
+.up-next-banner-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.up-next-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+}
+
+.up-next-votes-badge {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #ff9900;
+  background: rgba(255, 153, 0, 0.15);
+  border: 1px solid rgba(255, 153, 0, 0.35);
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+}
+
+.up-next-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.up-next-thumb {
+  width: 44px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.up-next-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.up-next-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.up-next-subtitle {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.btn-up-next-skip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid var(--neon-cyan);
+  border-radius: var(--radius-xs);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.btn-up-next-skip:hover {
+  background: var(--neon-cyan);
+  color: #030509;
+  box-shadow: 0 0 10px var(--neon-cyan-glow);
+}
+
+

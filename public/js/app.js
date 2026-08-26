@@ -138,8 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnJukeboxSearch = document.getElementById('btn-jukebox-search');
   const jukeboxSearchResults = document.getElementById('jukebox-search-results');
 
+  // Up Next In Queue Live Preview Elements
+  const upNextBanner = document.getElementById('up-next-banner');
+  const upNextThumb = document.getElementById('up-next-thumb');
+  const upNextTitle = document.getElementById('up-next-title');
+  const upNextSubtitle = document.getElementById('up-next-subtitle');
+  const upNextVotesBadge = document.getElementById('up-next-votes-badge');
+  const btnUpNextSkip = document.getElementById('btn-up-next-skip');
+
   // Auto-DJ Crossfade Elements
   const crossfadeButtons = document.querySelectorAll('.crossfade-btn');
+
 
   // 24/7 Live Radio Stations Elements
   const radioCards = document.querySelectorAll('.radio-card');
@@ -2108,6 +2117,25 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    if (btnUpNextSkip) {
+      btnUpNextSkip.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can skip to next queued song');
+          return;
+        }
+        if (currentQueue && currentQueue.length > 0) {
+          const nextTitle = currentQueue[0].track ? currentQueue[0].track.title : 'Next Song';
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_pop_next',
+              crossfadeSec: crossfadeDuration
+            }));
+            showToast(`⏭️ Playing Next: "${nextTitle}"`);
+          }
+        }
+      });
+    }
+
     if (btnJukeboxSearch && jukeboxSearchInput) {
       const runJukeboxSearch = () => {
         const q = jukeboxSearchInput.value.trim();
@@ -2142,8 +2170,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateUpNextPreview() {
+    if (!upNextBanner) return;
+    if (!currentQueue || currentQueue.length === 0) {
+      upNextBanner.style.display = 'none';
+      return;
+    }
+
+    const nextItem = currentQueue[0];
+    const track = nextItem.track || {};
+    upNextBanner.style.display = 'flex';
+    if (upNextThumb) {
+      upNextThumb.src = track.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIzNiI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzIyMiIvPjwvc3ZnPg==';
+    }
+    if (upNextTitle) {
+      upNextTitle.textContent = track.title || 'Unknown Title';
+    }
+    if (upNextSubtitle) {
+      const addedByText = nextItem.addedBy ? ` • Added by ${nextItem.addedBy}` : '';
+      upNextSubtitle.textContent = `${track.artist || 'YouTube'}${addedByText}`;
+    }
+    if (upNextVotesBadge) {
+      upNextVotesBadge.textContent = `🔥 ${nextItem.votes > 0 ? '+' : ''}${nextItem.votes} ${Math.abs(nextItem.votes) === 1 ? 'vote' : 'votes'}`;
+    }
+  }
+
   function renderJukeboxQueue() {
     if (queueCountDisplay) queueCountDisplay.textContent = currentQueue.length;
+    updateUpNextPreview();
+
     if (!jukeboxQueueList) return;
 
     if (currentQueue.length === 0) {
@@ -2248,6 +2303,7 @@ document.addEventListener('DOMContentLoaded', () => {
       jukeboxQueueList.appendChild(card);
     });
   }
+
 
   function createToastContainer() {
     const c = document.createElement('div');
