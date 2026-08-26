@@ -73,46 +73,58 @@ class AtmosphereEngine {
   detectThemeAndMood(title, artist = '') {
     const text = `${title || ''} ${artist || ''}`.toLowerCase();
 
-    // 1. Rain / Monsoon / Baarish
-    if (/\b(barsaat|baarish|barish|rain|rainy|monsoon|rimjhim|boond|boondein|water|badal|drizzle|cloud|megha|sawan|saawan|barkha|tip tip)\b/i.test(text) ||
+    // 1. Moonlit Meadow / Moon / Clouds / Breeze / Raat / Sukoon
+    if (/\b(moon|chand|chanda|chaand|cloud|clouds|breeze|hawa|meadow|grass|sukoon|peace|peaceful|calm|khoya|healing|night sky|lunar)\b/i.test(text) ||
+        text.includes('chand') || text.includes('moon') || text.includes('sukoon')) {
+      return { theme: 'moon', moodName: '🌙 Moonlit Meadow', keyword: 'Moonlit' };
+    }
+
+    // 2. Cherry Blossom / Sakura / Spring / Flowers
+    if (/\b(sakura|cherry|blossom|flower|flowers|phool|spring|anime|garden|gulabi|pink|petals|japanese|blossoms)\b/i.test(text) ||
+        text.includes('sakura') || text.includes('blossom') || text.includes('flower')) {
+      return { theme: 'sakura', moodName: '🌸 Cherry Blossom', keyword: 'Sakura' };
+    }
+
+    // 3. Rain / Monsoon / Baarish
+    if (/\b(barsaat|baarish|barish|rain|rainy|monsoon|rimjhim|boond|boondein|water|badal|drizzle|megha|sawan|saawan|barkha|tip tip)\b/i.test(text) ||
         text.includes('barsaat') || text.includes('baarish') || text.includes('barish') || text.includes('rain')) {
       return { theme: 'rain', moodName: '🌧️ Baarish / Rain', keyword: 'Baarish' };
     }
 
-    // 2. Romantic / Love / Dil / Ishq
-    if (/\b(romantic|romance|love|pyar|pyaar|dil|ishq|mohabbat|deewana|sanam|janam|jaan|humsafar|darshan raval|arijit|kesariya|shayari|valentine|crush|kiss|couple|terey bina|tum hi ho|aashiqui|humraaz|pehle|pehla nasha|sweetheart|romantic)\b/i.test(text) ||
+    // 4. Romantic / Love / Dil / Ishq
+    if (/\b(romantic|romance|love|pyar|pyaar|dil|ishq|mohabbat|deewana|sanam|janam|jaan|humsafar|darshan raval|arijit|kesariya|shayari|valentine|crush|kiss|couple|terey bina|tum hi ho|aashiqui|humraaz|pehle|pehla nasha|sweetheart)\b/i.test(text) ||
         text.includes('romantic') || text.includes('love') || text.includes('ishq') || text.includes('pyaar') || text.includes('dil') || text.includes('darshan raval')) {
       return { theme: 'hearts', moodName: '💖 Romantic / Love', keyword: 'Romantic' };
     }
 
-    // 3. Sad / Melancholy / Heartbreak / Cold / Snow
+    // 5. Sad / Melancholy / Heartbreak / Cold / Snow
     if (/\b(sad|alone|lonely|tanha|dard|judaai|tuta dil|broken|heartbreak|cry|crying|tears|goodbye|alvida|channa mereya|bekhayali|bewafa|depressed|pain|dukh|gham|ghamgeen|snow|winter|ice|cold|frost|baraf|barf|frozen|glacier|christmas)\b/i.test(text) ||
         text.includes('sad') || text.includes('lonely') || text.includes('dard') || text.includes('broken')) {
       return { theme: 'snow', moodName: '❄️ Sad / Melancholy', keyword: 'Sad' };
     }
 
-    // 4. Thunder / Storm / Heavy / Intense / Phonk
+    // 6. Thunder / Storm / Heavy / Intense / Phonk
     if (/\b(thunder|storm|lightning|bijli|toofan|thunderstorm|heavy|dark|rage|phonk|metal|hardcore|epic|battle|war|power|intense|drift|sigma|demon|danger|electric)\b/i.test(text)) {
       return { theme: 'thunder', moodName: '⚡ Thunder / Heavy', keyword: 'Thunder' };
     }
 
-    // 5. Fire / Sparks / Rock / Energy / Gym / Workout
+    // 7. Fire / Sparks / Rock / Energy / Gym / Workout
     if (/\b(fire|sparks|spark|flame|aag|jalwa|josh|rock|guitar|energy|hype|workout|gym|motivation|beast|ignite|blaze|heat|burn|sholay|dhamaka)\b/i.test(text)) {
       return { theme: 'sparks', moodName: '🔥 High Energy / Sparks', keyword: 'Energy' };
     }
 
-    // 6. Equalizer / EDM / Club / Bass / Party
+    // 8. Equalizer / EDM / Club / Bass / Party
     if (/\b(equalizer|eq|bass|drop|edm|club|electro|party|trap|remix|dj|mashup|dance|house|techno|rave|disco|festival|bounce|dubstep|hardstyle|banger)\b/i.test(text)) {
       return { theme: 'equalizer', moodName: '📊 EDM / Bass Booster', keyword: 'EDM / Bass' };
     }
 
-    // 7. Stars / Lofi / Cosmic / Chill / Night
-    if (/\b(night|star|stars|sky|moon|chand|raat|cosmic|space|galaxy|lofi|lo-fi|chill|sleep|relax|dream|midnight|slowed|reverb|peace|meditation|ambient|aesthetic|sunset)\b/i.test(text)) {
+    // 9. Stars / Lofi / Cosmic / Chill / Night
+    if (/\b(night|star|stars|sky|cosmic|space|galaxy|lofi|lo-fi|chill|sleep|relax|dream|midnight|slowed|reverb|ambient|aesthetic|sunset)\b/i.test(text)) {
       return { theme: 'stars', moodName: '✨ Cosmic / Lofi Stars', keyword: 'Cosmic / Lofi' };
     }
 
     // Default Fallback
-    return { theme: 'stars', moodName: '✨ Cosmic Stars', keyword: 'Ambient' };
+    return { theme: 'moon', moodName: '🌙 Moonlit Meadow', keyword: 'Moonlit' };
   }
 
   detectThemeFromTitle(title) {
@@ -123,16 +135,22 @@ class AtmosphereEngine {
     // Keep core UI tokens rock-solid & clean so song changes never disrupt UI/UX buttons or layout
   }
 
-
-
   initParticles() {
     this.bgParticles = [];
     this.fgParticles = [];
+    this.clouds = [];
 
     let bgCount = 50;
     let fgCount = 40;
 
-    if (this.currentTheme === 'stars') {
+    if (this.currentTheme === 'moon') {
+      bgCount = 50; // Night stars
+      fgCount = 28; // Glowing fireflies
+      this.initClouds();
+    } else if (this.currentTheme === 'sakura') {
+      bgCount = 60; // Background sakura petals
+      fgCount = 45; // Foreground sakura petals
+    } else if (this.currentTheme === 'stars') {
       bgCount = 90; // Deep cosmic stars
       fgCount = 45; // Moving foreground diamond stars
     } else if (this.currentTheme === 'snow') {
@@ -163,8 +181,98 @@ class AtmosphereEngine {
     }
   }
 
+  initClouds() {
+    this.clouds = [
+      {
+        x: this.width * 0.15,
+        y: this.height * 0.12,
+        scale: 1.0,
+        speed: 0.18,
+        alpha: 0.7,
+        puffs: [
+          { dx: 0, dy: 0, r: 45 },
+          { dx: 35, dy: -12, r: 55 },
+          { dx: 75, dy: -6, r: 48 },
+          { dx: 115, dy: 4, r: 40 }
+        ]
+      },
+      {
+        x: this.width * 0.65,
+        y: this.height * 0.22,
+        scale: 1.25,
+        speed: 0.12,
+        alpha: 0.6,
+        puffs: [
+          { dx: 0, dy: 0, r: 50 },
+          { dx: 45, dy: -16, r: 65 },
+          { dx: 95, dy: -8, r: 55 },
+          { dx: 145, dy: 5, r: 45 }
+        ]
+      },
+      {
+        x: this.width * 0.45,
+        y: this.height * 0.08,
+        scale: 0.85,
+        speed: 0.22,
+        alpha: 0.5,
+        puffs: [
+          { dx: 0, dy: 0, r: 35 },
+          { dx: 30, dy: -10, r: 45 },
+          { dx: 65, dy: 0, r: 38 }
+        ]
+      }
+    ];
+  }
+
   createParticle(isBg) {
-    if (this.currentTheme === 'stars') {
+    if (this.currentTheme === 'moon') {
+      if (isBg) {
+        return {
+          type: 'star',
+          x: Math.random() * this.width,
+          y: Math.random() * (this.height * 0.65),
+          size: 0.8 + Math.random() * 1.6,
+          alpha: 0.25 + Math.random() * 0.5,
+          twinkleSpeed: 0.02 + Math.random() * 0.03,
+          twinklePhase: Math.random() * Math.PI * 2,
+          color: Math.random() > 0.4 ? '#ffffff' : '#bae6fd'
+        };
+      } else {
+        return {
+          type: 'firefly',
+          x: Math.random() * this.width,
+          y: this.height - Math.random() * 100,
+          size: 2.2 + Math.random() * 2.2,
+          speedX: 0.5 + Math.random() * 0.7,
+          speedY: 0.3 + Math.random() * 0.5,
+          freqX: 0.8 + Math.random() * 0.8,
+          time: Math.random() * 100,
+          alpha: 0.5 + Math.random() * 0.4,
+          glowPhase: Math.random() * Math.PI * 2,
+          glowSpeed: 0.03 + Math.random() * 0.04,
+          color: Math.random() > 0.5 ? '#6ee7b7' : (Math.random() > 0.5 ? '#a7f3d0' : '#00f2fe')
+        };
+      }
+    } else if (this.currentTheme === 'sakura') {
+      const colors = ['#ffb7c5', '#ff94b8', '#ffc0cb', '#f472b6', '#fed7e2'];
+      return {
+        x: Math.random() * (this.width + 100) - 50,
+        y: Math.random() * this.height,
+        size: isBg ? (7 + Math.random() * 6) : (12 + Math.random() * 8),
+        speedX: isBg ? (0.8 + Math.random() * 1.3) : (1.4 + Math.random() * 1.8),
+        speedY: isBg ? (0.9 + Math.random() * 1.2) : (1.4 + Math.random() * 1.6),
+        wobblePhase: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.025 + Math.random() * 0.03,
+        rotX: Math.random() * Math.PI * 2,
+        rotY: Math.random() * Math.PI * 2,
+        rotZ: Math.random() * Math.PI * 2,
+        rotSpeedX: (Math.random() - 0.5) * 0.04,
+        rotSpeedY: (Math.random() - 0.5) * 0.04,
+        rotSpeedZ: (Math.random() - 0.5) * 0.05,
+        alpha: isBg ? (0.35 + Math.random() * 0.35) : (0.7 + Math.random() * 0.3),
+        color: colors[Math.floor(Math.random() * colors.length)]
+      };
+    } else if (this.currentTheme === 'stars') {
       return {
         x: Math.random() * this.width,
         y: Math.random() * this.height,
@@ -243,6 +351,7 @@ class AtmosphereEngine {
     }
   }
 
+
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
@@ -281,7 +390,11 @@ class AtmosphereEngine {
   renderUnderlay(bassEnergy, freqData) {
     if (!this.uCtx) return;
 
-    if (this.currentTheme === 'stars') {
+    if (this.currentTheme === 'moon') {
+      this.drawUnderlayMoon(bassEnergy);
+    } else if (this.currentTheme === 'sakura') {
+      this.drawUnderlaySakura(bassEnergy);
+    } else if (this.currentTheme === 'stars') {
       this.drawUnderlayStars();
     } else if (this.currentTheme === 'snow') {
       this.drawUnderlaySnow();
@@ -304,7 +417,11 @@ class AtmosphereEngine {
   renderOverlay(bassEnergy, freqData) {
     if (!this.oCtx) return;
 
-    if (this.currentTheme === 'stars') {
+    if (this.currentTheme === 'moon') {
+      this.drawOverlayMoon(bassEnergy);
+    } else if (this.currentTheme === 'sakura') {
+      this.drawOverlaySakura(bassEnergy);
+    } else if (this.currentTheme === 'stars') {
       this.drawOverlayStars();
     } else if (this.currentTheme === 'snow') {
       this.drawOverlaySnow();
@@ -320,6 +437,7 @@ class AtmosphereEngine {
       this.drawOverlaySparks();
     }
   }
+
 
   // ------------------------------------------
   // 1. ✨ DYNAMIC STARS & SHOOTING STAR COMETS
@@ -835,6 +953,234 @@ class AtmosphereEngine {
     this.oCtx.shadowBlur = 0;
     this.oCtx.globalAlpha = 1;
   }
+
+  // ------------------------------------------
+  // 8. 🌙 MOONLIT MEADOW (Glowing Moon, Clouds & Swaying Breeze Grass)
+  // ------------------------------------------
+  drawUnderlayMoon(bassEnergy) {
+    const time = performance.now();
+
+    // 1. Glowing Moon with Soft Multi-Layer Aura
+    const moonX = this.width * (this.width < 768 ? 0.82 : 0.78);
+    const moonY = this.height * 0.16;
+    const moonRadius = Math.min(this.width, this.height) * 0.055 + 14;
+
+    // Giant outer ambient lunar glow
+    const outerHalo = this.uCtx.createRadialGradient(moonX, moonY, moonRadius * 0.8, moonX, moonY, moonRadius * 3.8);
+    outerHalo.addColorStop(0, `rgba(180, 225, 255, ${0.28 + bassEnergy * 0.18})`);
+    outerHalo.addColorStop(0.5, `rgba(130, 190, 255, ${0.12 + bassEnergy * 0.08})`);
+    outerHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    this.uCtx.fillStyle = outerHalo;
+    this.uCtx.beginPath();
+    this.uCtx.arc(moonX, moonY, moonRadius * 3.8, 0, Math.PI * 2);
+    this.uCtx.fill();
+
+    // Moon disc
+    const moonDisc = this.uCtx.createRadialGradient(moonX - moonRadius * 0.3, moonY - moonRadius * 0.3, moonRadius * 0.1, moonX, moonY, moonRadius);
+    moonDisc.addColorStop(0, '#ffffff');
+    moonDisc.addColorStop(0.65, '#e8f4ff');
+    moonDisc.addColorStop(1, '#c5defa');
+
+    this.uCtx.fillStyle = moonDisc;
+    this.uCtx.beginPath();
+    this.uCtx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+    this.uCtx.fill();
+
+    // Moon crater maria
+    this.uCtx.fillStyle = 'rgba(160, 195, 235, 0.28)';
+    this.uCtx.beginPath();
+    this.uCtx.arc(moonX - moonRadius * 0.25, moonY - moonRadius * 0.2, moonRadius * 0.28, 0, Math.PI * 2);
+    this.uCtx.fill();
+
+    this.uCtx.beginPath();
+    this.uCtx.arc(moonX + moonRadius * 0.2, moonY + moonRadius * 0.25, moonRadius * 0.35, 0, Math.PI * 2);
+    this.uCtx.fill();
+
+    // 2. Distant Night Stars
+    for (let i = 0; i < this.bgParticles.length; i++) {
+      const p = this.bgParticles[i];
+      if (p.type === 'star') {
+        p.twinklePhase += p.twinkleSpeed;
+        const alpha = p.alpha * (0.5 + Math.sin(p.twinklePhase) * 0.5);
+        this.uCtx.globalAlpha = alpha;
+        this.uCtx.fillStyle = p.color || '#ffffff';
+        this.uCtx.beginPath();
+        this.uCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        this.uCtx.fill();
+      }
+    }
+
+    // 3. Drifting Soft Clouds
+    if (this.clouds) {
+      for (let i = 0; i < this.clouds.length; i++) {
+        const c = this.clouds[i];
+        c.x += c.speed;
+        if (c.x > this.width + 250) c.x = -250;
+
+        this.uCtx.save();
+        this.uCtx.globalAlpha = c.alpha * (0.85 + bassEnergy * 0.15);
+        this.uCtx.fillStyle = 'rgba(195, 225, 255, 0.18)';
+        this.uCtx.shadowColor = 'rgba(180, 220, 255, 0.25)';
+        this.uCtx.shadowBlur = 18;
+
+        for (let j = 0; j < c.puffs.length; j++) {
+          const puff = c.puffs[j];
+          this.uCtx.beginPath();
+          this.uCtx.arc(c.x + puff.dx * c.scale, c.y + puff.dy * c.scale, puff.r * c.scale, 0, Math.PI * 2);
+          this.uCtx.fill();
+        }
+        this.uCtx.restore();
+      }
+    }
+
+    // 4. Moving Meadow Grass Blades (Influenced by slow soothing breeze)
+    this.drawMeadowGrass(this.uCtx, time, bassEnergy, false);
+    this.uCtx.globalAlpha = 1;
+  }
+
+  drawOverlayMoon(bassEnergy) {
+    const time = performance.now();
+
+    // 1. Foreground Moving Grass Blades with Silvery Moonlight Sheen
+    this.drawMeadowGrass(this.oCtx, time, bassEnergy, true);
+
+    // 2. Glowing Fireflies / Meadow Light Motes
+    for (let i = 0; i < this.fgParticles.length; i++) {
+      const p = this.fgParticles[i];
+      if (p.type === 'firefly') {
+        p.time += 0.02;
+        p.x += Math.sin(p.time * p.freqX) * p.speedX;
+        p.y -= p.speedY;
+        p.glowPhase += p.glowSpeed;
+
+        const pulse = 0.4 + Math.sin(p.glowPhase) * 0.6;
+        const alpha = p.alpha * pulse;
+
+        this.oCtx.globalAlpha = alpha;
+        this.oCtx.fillStyle = p.color || '#a7f3d0';
+        this.oCtx.shadowColor = p.color || '#34d399';
+        this.oCtx.shadowBlur = 12 + bassEnergy * 10;
+        this.oCtx.beginPath();
+        this.oCtx.arc(p.x, p.y, p.size * (1 + bassEnergy * 0.5), 0, Math.PI * 2);
+        this.oCtx.fill();
+
+        if (p.y < this.height * 0.35 || p.x < 0 || p.x > this.width) {
+          p.x = Math.random() * this.width;
+          p.y = this.height - Math.random() * 80;
+        }
+      }
+    }
+    this.oCtx.shadowBlur = 0;
+    this.oCtx.globalAlpha = 1;
+  }
+
+  drawMeadowGrass(ctx, time, bassEnergy, isForeground) {
+    const bladeSpacing = isForeground ? 12 : 7;
+    const numBlades = Math.ceil(this.width / bladeSpacing) + 6;
+    const baseHeight = this.height;
+
+    for (let i = 0; i < numBlades; i++) {
+      const x = i * bladeSpacing + (Math.sin(i * 99) * 3);
+      const bladeLen = (isForeground ? (35 + Math.sin(i * 12) * 15 + Math.cos(i * 4) * 10) : (55 + Math.sin(i * 7) * 25 + Math.cos(i * 3) * 15));
+      
+      const breezeWave = Math.sin(time * 0.0016 + x * 0.004) * 18 + 
+                         Math.sin(time * 0.0032 + x * 0.009) * 8 +
+                         Math.sin(time * 0.0008) * 6;
+      
+      const bassSway = (bassEnergy * 20) * Math.sin(time * 0.006 + x * 0.015);
+      const totalSway = breezeWave + bassSway;
+
+      const tipX = x + totalSway;
+      const tipY = baseHeight - bladeLen;
+      const ctrlX = x + totalSway * 0.45;
+      const ctrlY = baseHeight - bladeLen * 0.55;
+
+      const grad = ctx.createLinearGradient(x, baseHeight, tipX, tipY);
+      if (isForeground) {
+        grad.addColorStop(0, 'rgba(3, 30, 20, 0.85)');
+        grad.addColorStop(0.5, 'rgba(5, 150, 105, 0.7)');
+        grad.addColorStop(1, 'rgba(110, 231, 183, 0.9)');
+      } else {
+        grad.addColorStop(0, 'rgba(2, 20, 14, 0.95)');
+        grad.addColorStop(0.6, 'rgba(4, 120, 87, 0.6)');
+        grad.addColorStop(1, 'rgba(52, 211, 153, 0.7)');
+      }
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = isForeground ? (2.2 + (i % 3) * 0.6) : (3.2 + (i % 4) * 0.8);
+      ctx.lineCap = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(x, baseHeight);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+      ctx.stroke();
+    }
+  }
+
+  // ------------------------------------------
+  // 9. 🌸 CHERRY BLOSSOM SAKURA PETAL STORM
+  // ------------------------------------------
+  drawUnderlaySakura(bassEnergy) {
+    this.renderSakuraPetals(this.uCtx, this.bgParticles, bassEnergy, true);
+  }
+
+  drawOverlaySakura(bassEnergy) {
+    this.renderSakuraPetals(this.oCtx, this.fgParticles, bassEnergy, false);
+  }
+
+  renderSakuraPetals(ctx, particles, bassEnergy, isUnderlay) {
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.wobblePhase += p.wobbleSpeed;
+      p.rotX += p.rotSpeedX;
+      p.rotY += p.rotSpeedY;
+      p.rotZ += p.rotSpeedZ;
+
+      const windPush = isUnderlay ? 1.0 : 1.6;
+      p.x += (p.speedX + Math.sin(p.wobblePhase) * 0.8 + bassEnergy * 4.0) * windPush;
+      p.y += (p.speedY + Math.cos(p.wobblePhase) * 0.5) * windPush;
+
+      const scaleX = Math.cos(p.rotX);
+      const scaleY = Math.sin(p.rotY) * 0.9;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotZ);
+      ctx.scale(Math.abs(scaleX) < 0.15 ? 0.15 : scaleX, Math.abs(scaleY) < 0.15 ? 0.15 : scaleY);
+
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      if (!isUnderlay) {
+        ctx.shadowColor = 'rgba(255, 182, 193, 0.5)';
+        ctx.shadowBlur = 6 + bassEnergy * 8;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size);
+      ctx.bezierCurveTo(p.size * 0.85, -p.size * 0.8, p.size * 0.95, p.size * 0.35, 0, p.size);
+      ctx.bezierCurveTo(-p.size * 0.95, p.size * 0.35, -p.size * 0.85, -p.size * 0.8, 0, -p.size);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size * 0.8);
+      ctx.lineTo(0, p.size * 0.7);
+      ctx.stroke();
+
+      ctx.restore();
+
+      if (p.y > this.height + 30 || p.x > this.width + 40) {
+        particles[i] = this.createParticle(isUnderlay);
+        particles[i].x = Math.random() * (this.width + 200) - 200;
+        particles[i].y = -20;
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
 }
 
 window.AtmosphereEngine = AtmosphereEngine;
+

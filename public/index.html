@@ -45,18 +45,111 @@
         </div>
       </div>
 
-      <!-- Atmospheric Theme Mood Selector -->
-      <div class="atmosphere-picker">
-        <span class="atmo-label">Atmosphere</span>
-        <button id="btn-atmo-auto" class="atmo-btn active" data-theme="auto" title="✨ AI Auto-Detect theme based on currently playing song keywords">✨ Auto Sync</button>
-        <button class="atmo-btn" data-theme="rain" title="🌧️ Raindrops & Monsoon Mood (Baarish)">🌧️ Rain</button>
-        <button class="atmo-btn" data-theme="hearts" title="💖 Floating Hearts & Romance (Romantic)">💖 Hearts</button>
-        <button class="atmo-btn" data-theme="snow" title="❄️ Drifting Snowflakes & Sad/Melancholy Mood">❄️ Snow</button>
-        <button class="atmo-btn" data-theme="thunder" title="⚡ Storm Lightning & Heavy Bass Flashes">⚡ Thunder</button>
-        <button class="atmo-btn" data-theme="equalizer" title="📊 Real-Time Ambient Equalizer Spectrum">📊 EQ Bars</button>
-        <button class="atmo-btn" data-theme="stars" title="✨ Twinkling Cosmic Stars & Chill Lofi">✨ Stars</button>
-        <button class="atmo-btn" data-theme="sparks" title="🔥 High-Energy Sparks & Fire">🔥 Sparks</button>
+      <!-- Consolidated Atmospheric Theme Mood Menu -->
+      <div class="theme-dropdown-container">
+        <button id="btn-theme-menu-toggle" class="theme-menu-btn" title="Choose Atmosphere & Visual Theme">
+          <span id="current-theme-icon" class="theme-btn-icon">✨</span>
+          <span id="current-theme-name" class="theme-menu-text">Theme: Auto</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="theme-chevron-svg">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+
+        <div id="theme-dropdown-menu" class="theme-dropdown-menu">
+          <div class="theme-menu-header">🎨 Atmosphere Themes</div>
+          
+          <button class="atmo-btn active" data-theme="auto">
+            <span class="theme-item-icon">✨</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">AI Auto Mood Sync</span>
+              <span class="theme-item-desc">Matches current song keywords</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="moon">
+            <span class="theme-item-icon">🌙</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Moonlit Meadow</span>
+              <span class="theme-item-desc">Glowing moon, clouds & breeze grass</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="sakura">
+            <span class="theme-item-icon">🌸</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Cherry Blossom</span>
+              <span class="theme-item-desc">Sakura petal storm in spring breeze</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="rain">
+            <span class="theme-item-icon">🌧️</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Monsoon Rain</span>
+              <span class="theme-item-desc">Raindrops & Baarish mood</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="hearts">
+            <span class="theme-item-icon">💖</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Romantic Hearts</span>
+              <span class="theme-item-desc">Rising neon hearts & romance</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="stars">
+            <span class="theme-item-icon">🌌</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Cosmic Galaxy</span>
+              <span class="theme-item-desc">Twinkling stars & shooting star comets</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="snow">
+            <span class="theme-item-icon">❄️</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Winter Snow</span>
+              <span class="theme-item-desc">Drifting crystalline snowflakes</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="thunder">
+            <span class="theme-item-icon">⚡</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Thunderstorm</span>
+              <span class="theme-item-desc">Lightning flashes & heavy bass storm</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="sparks">
+            <span class="theme-item-icon">🔥</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">Sparks & Fire</span>
+              <span class="theme-item-desc">Fiery embers & high-energy rock</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+
+          <button class="atmo-btn" data-theme="equalizer">
+            <span class="theme-item-icon">📊</span>
+            <div class="theme-item-info">
+              <span class="theme-item-title">EDM Spectrum</span>
+              <span class="theme-item-desc">Live audio frequency EQ bars</span>
+            </div>
+            <span class="theme-check-icon">✓</span>
+          </button>
+        </div>
       </div>
+
 
 
       <div class="header-telemetry-cluster">

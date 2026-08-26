@@ -177,59 +177,168 @@ body {
   flex-wrap: wrap;
 }
 
-/* Atmosphere Mood Selector with Snow, Thunder, EQ, Rain, Hearts */
-.atmosphere-picker {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  background: rgba(0, 0, 0, 0.45);
-  padding: 3px 6px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-medium);
-  flex-wrap: wrap;
+/* Consolidated Atmosphere & Visual Theme Dropdown Menu */
+.theme-dropdown-container {
+  position: relative;
+  display: inline-block;
+  z-index: 1000;
 }
 
-.atmo-label {
-  font-size: 0.65rem;
+.theme-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.12), rgba(121, 40, 202, 0.15));
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 242, 254, 0.1);
+  transition: all var(--transition-fast);
+}
+
+.theme-menu-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.22), rgba(121, 40, 202, 0.25));
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.25);
+  transform: translateY(-1px);
+}
+
+.theme-btn-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.theme-menu-text {
+  white-space: nowrap;
   font-weight: 700;
-  color: var(--text-tertiary);
+  letter-spacing: 0.3px;
+}
+
+.theme-chevron-svg {
+  width: 13px !important;
+  height: 13px !important;
+  transition: transform 0.2s ease;
+  color: var(--neon-cyan);
+}
+
+.theme-dropdown-container.open .theme-chevron-svg {
+  transform: rotate(180deg);
+}
+
+.theme-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 270px;
+  background: rgba(11, 17, 32, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 242, 254, 0.15);
+  z-index: 10000;
+  max-height: 420px;
+  overflow-y: auto;
+  animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.theme-dropdown-container.open .theme-dropdown-menu {
+  display: flex;
+}
+
+.theme-menu-header {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  margin-right: 2px;
-  padding-left: 4px;
+  color: var(--neon-cyan);
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 2px;
 }
 
 .atmo-btn {
-  padding: 3px 8px;
-  font-size: 0.7rem;
-  border-radius: var(--radius-full);
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
   display: flex;
   align-items: center;
-  gap: 3px;
-  white-space: nowrap;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all var(--transition-fast);
 }
 
 .atmo-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .atmo-btn.active {
-  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
-  color: #000;
-  font-weight: 700;
+  background: linear-gradient(90deg, rgba(0, 242, 254, 0.15), rgba(121, 40, 202, 0.12));
+  border-color: rgba(0, 242, 254, 0.4);
+  color: #ffffff;
 }
 
-#btn-atmo-auto.active {
-  background: linear-gradient(135deg, #00f2fe, #ff007f);
-  color: #fff;
-  font-weight: 700;
-  box-shadow: 0 0 14px rgba(0, 242, 254, 0.45);
+.theme-item-icon {
+  font-size: 1.15rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
 }
+
+.theme-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.theme-item-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.theme-item-desc {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.theme-check-icon {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  display: none;
+  margin-left: 6px;
+}
+
+.atmo-btn.active .theme-check-icon {
+  display: inline-block;
+}
+
 
 
 .status-pill {

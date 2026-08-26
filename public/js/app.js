@@ -16,10 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnShareQr = document.getElementById('btn-share-qr');
   const btnOpenJoinModal = document.getElementById('btn-open-join-modal');
   const atmoButtons = document.querySelectorAll('.atmo-btn');
+  const btnThemeMenuToggle = document.getElementById('btn-theme-menu-toggle');
+  const themeDropdownContainer = document.querySelector('.theme-dropdown-container');
+  const themeDropdownMenu = document.getElementById('theme-dropdown-menu');
+  const currentThemeIcon = document.getElementById('current-theme-icon');
+  const currentThemeName = document.getElementById('current-theme-name');
   const atmosphereUnderlay = document.getElementById('atmosphere-underlay');
   const atmosphereOverlay = document.getElementById('atmosphere-overlay');
   const floatingReactionsLayer = document.getElementById('screen-floating-reactions-layer');
   const trackMoodBadge = document.getElementById('track-mood-badge');
+
 
   // Device Name Controls
   const btnEditDevice = document.getElementById('btn-edit-device');
@@ -275,7 +281,34 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAutoAtmosphere = true;
   let manualSelectedTheme = null;
 
+  const themeMetadata = {
+    auto: { icon: '✨', name: 'Auto Sync' },
+    moon: { icon: '🌙', name: 'Moonlit' },
+    sakura: { icon: '🌸', name: 'Sakura' },
+    rain: { icon: '🌧️', name: 'Rain' },
+    hearts: { icon: '💖', name: 'Hearts' },
+    stars: { icon: '🌌', name: 'Galaxy' },
+    snow: { icon: '❄️', name: 'Snow' },
+    thunder: { icon: '⚡', name: 'Thunder' },
+    sparks: { icon: '🔥', name: 'Sparks' },
+    equalizer: { icon: '📊', name: 'EQ Bars' }
+  };
+
   function setupAtmosphere() {
+    // Menu Dropdown Toggle
+    if (btnThemeMenuToggle && themeDropdownContainer) {
+      btnThemeMenuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        themeDropdownContainer.classList.toggle('open');
+      });
+
+      window.addEventListener('click', (e) => {
+        if (!themeDropdownContainer.contains(e.target)) {
+          themeDropdownContainer.classList.remove('open');
+        }
+      });
+    }
+
     if (atmosphereUnderlay || atmosphereOverlay) {
       atmosphereEngine = new AtmosphereEngine(atmosphereUnderlay, atmosphereOverlay, audioEngine);
       atmosphereEngine.start();
@@ -283,11 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
       atmoButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           const theme = btn.dataset.theme;
+          if (themeDropdownContainer) themeDropdownContainer.classList.remove('open');
+
           if (theme === 'auto') {
             isAutoAtmosphere = true;
             manualSelectedTheme = null;
             atmoButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            if (currentThemeIcon) currentThemeIcon.textContent = '✨';
+            if (currentThemeName) currentThemeName.textContent = 'Theme: Auto';
             showToast('✨ Auto Mood-Sync Enabled: Theme automatically matches song keywords');
             if (currentTrack) {
               applyAutoAtmosphereForTrack(currentTrack, true);
@@ -320,6 +357,11 @@ document.addEventListener('DOMContentLoaded', () => {
           b.classList.remove('active');
         }
       });
+
+      const meta = themeMetadata[moodResult.theme] || { icon: '✨', name: 'Auto' };
+      if (currentThemeIcon) currentThemeIcon.textContent = meta.icon;
+      if (currentThemeName) currentThemeName.textContent = `Theme: ${meta.name} (Auto)`;
+
       if (showNotice) {
         showToast(`✨ Auto Mood-Sync: ${moodResult.moodName}`);
       }
@@ -336,10 +378,16 @@ document.addEventListener('DOMContentLoaded', () => {
         b.classList.remove('active');
       }
     });
+
+    const meta = themeMetadata[theme] || { icon: '🎨', name: theme };
+    if (currentThemeIcon) currentThemeIcon.textContent = meta.icon;
+    if (currentThemeName) currentThemeName.textContent = `Theme: ${meta.name}`;
+
     if (isManual) {
-      showToast(`🎨 Theme Locked: ${theme.toUpperCase()} (Click "Auto Sync" to re-enable AI)`);
+      showToast(`🎨 Theme Locked: ${meta.name.toUpperCase()} (Select "Auto Sync" in Theme menu to re-enable AI)`);
     }
   }
+
 
 
   function generateRoomCode() {
