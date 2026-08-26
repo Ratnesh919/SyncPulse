@@ -73,17 +73,24 @@ class AtmosphereEngine {
   detectThemeAndMood(title, artist = '') {
     const text = `${title || ''} ${artist || ''}`.toLowerCase();
 
-    // 1. Moonlit Meadow / Moon / Clouds / Breeze / Raat / Sukoon
+    // 1. Sunny Cloudy Meadow / Sun / Sunshine / Day / Bright / Summer
+    if (/\b(sun|sunny|sunshine|day|morning|subah|dhoop|roshni|bright|summer|golden|cheerful|happy|khushi|suraj|savera|muskurahat)\b/i.test(text) ||
+        text.includes('sunny') || text.includes('sunshine') || text.includes('suraj') || text.includes('dhoop')) {
+      return { theme: 'sunny', moodName: '☀️ Sunny Meadow', keyword: 'Sunny' };
+    }
+
+    // 2. Moonlit Meadow / Moon / Clouds / Breeze / Raat / Sukoon
     if (/\b(moon|chand|chanda|chaand|cloud|clouds|breeze|hawa|meadow|grass|sukoon|peace|peaceful|calm|khoya|healing|night sky|lunar)\b/i.test(text) ||
         text.includes('chand') || text.includes('moon') || text.includes('sukoon')) {
       return { theme: 'moon', moodName: '🌙 Moonlit Meadow', keyword: 'Moonlit' };
     }
 
-    // 2. Cherry Blossom / Sakura / Spring / Flowers
+    // 3. Cherry Blossom / Sakura / Spring / Flowers
     if (/\b(sakura|cherry|blossom|flower|flowers|phool|spring|anime|garden|gulabi|pink|petals|japanese|blossoms)\b/i.test(text) ||
         text.includes('sakura') || text.includes('blossom') || text.includes('flower')) {
       return { theme: 'sakura', moodName: '🌸 Cherry Blossom', keyword: 'Sakura' };
     }
+
 
     // 3. Rain / Monsoon / Baarish
     if (/\b(barsaat|baarish|barish|rain|rainy|monsoon|rimjhim|boond|boondein|water|badal|drizzle|megha|sawan|saawan|barkha|tip tip)\b/i.test(text) ||
@@ -143,7 +150,11 @@ class AtmosphereEngine {
     let bgCount = 50;
     let fgCount = 40;
 
-    if (this.currentTheme === 'moon') {
+    if (this.currentTheme === 'sunny') {
+      bgCount = 45; // Sunbeams & light glints
+      fgCount = 30; // Floating dandelion fluffs / sun pollen
+      this.initSunnyClouds();
+    } else if (this.currentTheme === 'moon') {
       bgCount = 50; // Night stars
       fgCount = 28; // Glowing fireflies
       this.initClouds();
@@ -180,6 +191,50 @@ class AtmosphereEngine {
       this.fgParticles.push(this.createParticle(false));
     }
   }
+
+  initSunnyClouds() {
+    this.clouds = [
+      {
+        x: this.width * 0.08,
+        y: this.height * 0.14,
+        scale: 1.15,
+        speed: 0.18,
+        alpha: 0.88,
+        puffs: [
+          { dx: 0, dy: 0, r: 50 },
+          { dx: 40, dy: -15, r: 62 },
+          { dx: 86, dy: -8, r: 54 },
+          { dx: 130, dy: 6, r: 44 }
+        ]
+      },
+      {
+        x: this.width * 0.52,
+        y: this.height * 0.22,
+        scale: 1.35,
+        speed: 0.12,
+        alpha: 0.82,
+        puffs: [
+          { dx: 0, dy: 0, r: 55 },
+          { dx: 50, dy: -20, r: 72 },
+          { dx: 110, dy: -10, r: 62 },
+          { dx: 160, dy: 8, r: 50 }
+        ]
+      },
+      {
+        x: this.width * 0.32,
+        y: this.height * 0.08,
+        scale: 0.95,
+        speed: 0.22,
+        alpha: 0.7,
+        puffs: [
+          { dx: 0, dy: 0, r: 40 },
+          { dx: 34, dy: -12, r: 50 },
+          { dx: 72, dy: 2, r: 42 }
+        ]
+      }
+    ];
+  }
+
 
   initClouds() {
     this.clouds = [
@@ -225,7 +280,32 @@ class AtmosphereEngine {
   }
 
   createParticle(isBg) {
-    if (this.currentTheme === 'moon') {
+    if (this.currentTheme === 'sunny') {
+
+      if (isBg) {
+        return {
+          type: 'sunbeam',
+          angle: Math.random() * Math.PI * 2,
+          length: 80 + Math.random() * 140,
+          speed: 0.0015 + Math.random() * 0.003,
+          alpha: 0.2 + Math.random() * 0.3,
+          width: 1.5 + Math.random() * 2.5
+        };
+      } else {
+        return {
+          type: 'dandelion',
+          x: Math.random() * this.width,
+          y: this.height - Math.random() * 120,
+          size: 1.8 + Math.random() * 2.5,
+          speedX: 0.8 + Math.random() * 1.2,
+          speedY: 0.35 + Math.random() * 0.55,
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleSpeed: 0.02 + Math.random() * 0.03,
+          alpha: 0.45 + Math.random() * 0.45,
+          color: Math.random() > 0.4 ? '#fef08a' : (Math.random() > 0.5 ? '#ffffff' : '#fde047')
+        };
+      }
+    } else if (this.currentTheme === 'moon') {
       if (isBg) {
         return {
           type: 'star',
@@ -351,7 +431,6 @@ class AtmosphereEngine {
     }
   }
 
-
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
@@ -390,7 +469,9 @@ class AtmosphereEngine {
   renderUnderlay(bassEnergy, freqData) {
     if (!this.uCtx) return;
 
-    if (this.currentTheme === 'moon') {
+    if (this.currentTheme === 'sunny') {
+      this.drawUnderlaySunny(bassEnergy);
+    } else if (this.currentTheme === 'moon') {
       this.drawUnderlayMoon(bassEnergy);
     } else if (this.currentTheme === 'sakura') {
       this.drawUnderlaySakura(bassEnergy);
@@ -417,7 +498,9 @@ class AtmosphereEngine {
   renderOverlay(bassEnergy, freqData) {
     if (!this.oCtx) return;
 
-    if (this.currentTheme === 'moon') {
+    if (this.currentTheme === 'sunny') {
+      this.drawOverlaySunny(bassEnergy);
+    } else if (this.currentTheme === 'moon') {
       this.drawOverlayMoon(bassEnergy);
     } else if (this.currentTheme === 'sakura') {
       this.drawOverlaySakura(bassEnergy);
@@ -437,6 +520,8 @@ class AtmosphereEngine {
       this.drawOverlaySparks();
     }
   }
+
+
 
 
   // ------------------------------------------
@@ -1180,7 +1265,179 @@ class AtmosphereEngine {
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
+
+  // ------------------------------------------
+  // 10. ☀️ SUNNY CLOUDY MEADOW (Sun, Clouds & Swaying Breeze Grass)
+  // ------------------------------------------
+  drawUnderlaySunny(bassEnergy) {
+    const time = performance.now();
+
+    // 1. Radiant Golden Daytime Sun
+    const sunX = this.width * (this.width < 768 ? 0.82 : 0.78);
+    const sunY = this.height * 0.16;
+    const sunRadius = Math.min(this.width, this.height) * 0.065 + 16;
+
+    // Giant outer ambient warm solar corona
+    const outerCorona = this.uCtx.createRadialGradient(sunX, sunY, sunRadius * 0.6, sunX, sunY, sunRadius * 4.2);
+    outerCorona.addColorStop(0, `rgba(255, 220, 100, ${0.4 + bassEnergy * 0.25})`);
+    outerCorona.addColorStop(0.35, `rgba(255, 180, 50, ${0.2 + bassEnergy * 0.12})`);
+    outerCorona.addColorStop(0.7, `rgba(255, 140, 20, ${0.08 + bassEnergy * 0.05})`);
+    outerCorona.addColorStop(1, 'rgba(255, 120, 0, 0)');
+
+    this.uCtx.fillStyle = outerCorona;
+    this.uCtx.beginPath();
+    this.uCtx.arc(sunX, sunY, sunRadius * 4.2, 0, Math.PI * 2);
+    this.uCtx.fill();
+
+    // 8 Pulsing & Rotating Sunbeam Rays
+    const numRays = 8;
+    const rayAngleOffset = time * 0.0004;
+    const maxRayLen = sunRadius * (2.4 + bassEnergy * 1.5);
+    
+    this.uCtx.save();
+    this.uCtx.translate(sunX, sunY);
+    for (let r = 0; r < numRays; r++) {
+      const angle = (r * (Math.PI * 2 / numRays)) + rayAngleOffset;
+      const rayAlpha = 0.12 + Math.sin(time * 0.002 + r) * 0.05 + bassEnergy * 0.12;
+      this.uCtx.strokeStyle = `rgba(255, 235, 150, ${rayAlpha})`;
+      this.uCtx.lineWidth = 3 + bassEnergy * 4;
+      this.uCtx.beginPath();
+      this.uCtx.moveTo(Math.cos(angle) * (sunRadius * 0.9), Math.sin(angle) * (sunRadius * 0.9));
+      this.uCtx.lineTo(Math.cos(angle) * maxRayLen, Math.sin(angle) * maxRayLen);
+      this.uCtx.stroke();
+    }
+    this.uCtx.restore();
+
+    // Hot Golden Sun Disc Core
+    const sunDisc = this.uCtx.createRadialGradient(sunX - sunRadius * 0.2, sunY - sunRadius * 0.2, sunRadius * 0.1, sunX, sunY, sunRadius);
+    sunDisc.addColorStop(0, '#ffffff');
+    sunDisc.addColorStop(0.5, '#fff7ae');
+    sunDisc.addColorStop(0.85, '#fde047');
+    sunDisc.addColorStop(1, '#f59e0b');
+
+    this.uCtx.fillStyle = sunDisc;
+    this.uCtx.shadowColor = '#facc15';
+    this.uCtx.shadowBlur = 24 + bassEnergy * 18;
+    this.uCtx.beginPath();
+    this.uCtx.arc(sunX, sunY, sunRadius * (1 + bassEnergy * 0.08), 0, Math.PI * 2);
+    this.uCtx.fill();
+    this.uCtx.shadowBlur = 0;
+
+    // 2. Bright Sunlit White/Cream Daytime Clouds
+    if (this.clouds) {
+      for (let i = 0; i < this.clouds.length; i++) {
+        const c = this.clouds[i];
+        c.x += c.speed;
+        if (c.x > this.width + 300) c.x = -300;
+
+        this.uCtx.save();
+        this.uCtx.globalAlpha = c.alpha * (0.88 + bassEnergy * 0.12);
+        this.uCtx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+        this.uCtx.shadowColor = 'rgba(255, 248, 220, 0.4)';
+        this.uCtx.shadowBlur = 20;
+
+        for (let j = 0; j < c.puffs.length; j++) {
+          const puff = c.puffs[j];
+          this.uCtx.beginPath();
+          this.uCtx.arc(c.x + puff.dx * c.scale, c.y + puff.dy * c.scale, puff.r * c.scale, 0, Math.PI * 2);
+          this.uCtx.fill();
+        }
+        this.uCtx.restore();
+      }
+    }
+
+    // 3. Background Sunlit Emerald Grass Meadow
+    this.drawSunnyMeadowGrass(this.uCtx, time, bassEnergy, false);
+    this.uCtx.globalAlpha = 1;
+  }
+
+  drawOverlaySunny(bassEnergy) {
+    const time = performance.now();
+
+    // 1. Foreground Sunlit Emerald/Lime Grass Blades
+    this.drawSunnyMeadowGrass(this.oCtx, time, bassEnergy, true);
+
+    // 2. Floating Golden Dandelion Spores & Sunlit Pollen Motes
+    for (let i = 0; i < this.fgParticles.length; i++) {
+      const p = this.fgParticles[i];
+      if (p.type === 'dandelion') {
+        p.wobblePhase += p.wobbleSpeed;
+        p.x += p.speedX + Math.sin(p.wobblePhase) * 0.6 + bassEnergy * 2.5;
+        p.y -= p.speedY + Math.cos(p.wobblePhase) * 0.3;
+
+        this.oCtx.globalAlpha = p.alpha;
+        this.oCtx.fillStyle = p.color || '#fef08a';
+        this.oCtx.shadowColor = '#facc15';
+        this.oCtx.shadowBlur = 8 + bassEnergy * 8;
+        
+        this.oCtx.beginPath();
+        this.oCtx.arc(p.x, p.y, p.size * (1 + bassEnergy * 0.4), 0, Math.PI * 2);
+        this.oCtx.fill();
+
+        // Little dandelion seed whisker
+        this.oCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        this.oCtx.lineWidth = 0.8;
+        this.oCtx.beginPath();
+        this.oCtx.moveTo(p.x, p.y);
+        this.oCtx.lineTo(p.x - 3, p.y + 4);
+        this.oCtx.stroke();
+
+        if (p.y < this.height * 0.25 || p.x > this.width + 20) {
+          p.x = Math.random() * (this.width * 0.8);
+          p.y = this.height - Math.random() * 60;
+        }
+      }
+    }
+    this.oCtx.shadowBlur = 0;
+    this.oCtx.globalAlpha = 1;
+  }
+
+  drawSunnyMeadowGrass(ctx, time, bassEnergy, isForeground) {
+    const bladeSpacing = isForeground ? 11 : 6.5;
+    const numBlades = Math.ceil(this.width / bladeSpacing) + 6;
+    const baseHeight = this.height;
+
+    for (let i = 0; i < numBlades; i++) {
+      const x = i * bladeSpacing + (Math.sin(i * 77) * 3);
+      const bladeLen = (isForeground ? (38 + Math.sin(i * 11) * 16 + Math.cos(i * 5) * 10) : (58 + Math.sin(i * 8) * 26 + Math.cos(i * 3) * 16));
+      
+      const breezeWave = Math.sin(time * 0.0018 + x * 0.004) * 20 + 
+                         Math.sin(time * 0.0035 + x * 0.008) * 9 +
+                         Math.sin(time * 0.0009) * 7;
+      
+      const bassSway = (bassEnergy * 24) * Math.sin(time * 0.007 + x * 0.016);
+      const totalSway = breezeWave + bassSway;
+
+      const tipX = x + totalSway;
+      const tipY = baseHeight - bladeLen;
+      const ctrlX = x + totalSway * 0.45;
+      const ctrlY = baseHeight - bladeLen * 0.55;
+
+      const grad = ctx.createLinearGradient(x, baseHeight, tipX, tipY);
+      if (isForeground) {
+        grad.addColorStop(0, 'rgba(6, 78, 59, 0.9)');
+        grad.addColorStop(0.45, 'rgba(16, 185, 129, 0.85)');
+        grad.addColorStop(0.8, 'rgba(132, 204, 22, 0.95)');
+        grad.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
+      } else {
+        grad.addColorStop(0, 'rgba(4, 47, 46, 0.95)');
+        grad.addColorStop(0.5, 'rgba(5, 150, 105, 0.75)');
+        grad.addColorStop(0.85, 'rgba(101, 163, 13, 0.8)');
+        grad.addColorStop(1, 'rgba(217, 249, 157, 0.85)');
+      }
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = isForeground ? (2.4 + (i % 3) * 0.6) : (3.4 + (i % 4) * 0.8);
+      ctx.lineCap = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(x, baseHeight);
+      ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+      ctx.stroke();
+    }
+  }
 }
 
 window.AtmosphereEngine = AtmosphereEngine;
+
 

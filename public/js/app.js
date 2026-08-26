@@ -283,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const themeMetadata = {
     auto: { icon: '✨', name: 'Auto Sync' },
+    sunny: { icon: '☀️', name: 'Sunny' },
     moon: { icon: '🌙', name: 'Moonlit' },
     sakura: { icon: '🌸', name: 'Sakura' },
     rain: { icon: '🌧️', name: 'Rain' },
@@ -293,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sparks: { icon: '🔥', name: 'Sparks' },
     equalizer: { icon: '📊', name: 'EQ Bars' }
   };
+
 
   function setupAtmosphere() {
     // Menu Dropdown Toggle
