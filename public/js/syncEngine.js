@@ -119,8 +119,9 @@ class SyncEngine {
     if (this.syncIntervalTimer) clearInterval(this.syncIntervalTimer);
     this.syncIntervalTimer = setInterval(() => {
       this.sendPing();
-    }, 2500);
+    }, 2000);
   }
+
 
   stop() {
     if (this.syncIntervalTimer) clearInterval(this.syncIntervalTimer);

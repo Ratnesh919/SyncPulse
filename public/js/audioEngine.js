@@ -422,13 +422,14 @@ class AudioEngine {
     this.runAutoSyncCycle();
   }
 
-  // Continuous Latency Auto-Corrector: Checks every 5 seconds and auto-fixes delay
+  // Continuous Latency Auto-Corrector: Checks every 2 seconds and auto-fixes delay
   startContinuousAutoSync() {
     if (this.autoSyncIntervalTimer) clearInterval(this.autoSyncIntervalTimer);
     this.autoSyncIntervalTimer = setInterval(() => {
       this.runAutoSyncCycle();
-    }, 5000);
+    }, 2000);
   }
+
 
   runAutoSyncCycle() {
     if (!this.autoSyncActive || !this.isPlaying || !this.ctx || !this.syncEngineRef || !this.currentBuffer) {

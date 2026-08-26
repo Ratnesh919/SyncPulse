@@ -120,51 +120,9 @@ class AtmosphereEngine {
   }
 
   applyThemeColors(theme) {
-    const root = document.documentElement;
-    if (theme === 'snow') {
-      root.style.setProperty('--neon-cyan', '#80d4ff');
-      root.style.setProperty('--neon-magenta', '#d0f0fd');
-      root.style.setProperty('--bg-deep', '#030814');
-      root.style.setProperty('--bg-base', '#061026');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(128, 212, 255, 0.25)');
-    } else if (theme === 'thunder') {
-      root.style.setProperty('--neon-cyan', '#a855f7');
-      root.style.setProperty('--neon-magenta', '#00f2fe');
-      root.style.setProperty('--bg-deep', '#020108');
-      root.style.setProperty('--bg-base', '#090417');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(168, 85, 247, 0.25)');
-    } else if (theme === 'equalizer') {
-      root.style.setProperty('--neon-cyan', '#00f5a0');
-      root.style.setProperty('--neon-magenta', '#ff007f');
-      root.style.setProperty('--bg-deep', '#03060a');
-      root.style.setProperty('--bg-base', '#070f1a');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(0, 245, 160, 0.25)');
-    } else if (theme === 'rain') {
-      root.style.setProperty('--neon-cyan', '#00f2fe');
-      root.style.setProperty('--neon-magenta', '#0088ff');
-      root.style.setProperty('--bg-deep', '#020813');
-      root.style.setProperty('--bg-base', '#040d1e');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(0, 242, 254, 0.25)');
-    } else if (theme === 'hearts') {
-      root.style.setProperty('--neon-cyan', '#ff2d75');
-      root.style.setProperty('--neon-magenta', '#ff007f');
-      root.style.setProperty('--bg-deep', '#0d0208');
-      root.style.setProperty('--bg-base', '#16040e');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(255, 45, 117, 0.25)');
-    } else if (theme === 'stars') {
-      root.style.setProperty('--neon-cyan', '#a855f7');
-      root.style.setProperty('--neon-magenta', '#00f2fe');
-      root.style.setProperty('--bg-deep', '#04020a');
-      root.style.setProperty('--bg-base', '#0a0518');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(168, 85, 247, 0.25)');
-    } else if (theme === 'sparks') {
-      root.style.setProperty('--neon-cyan', '#ff9900');
-      root.style.setProperty('--neon-magenta', '#ff3300');
-      root.style.setProperty('--bg-deep', '#0d0402');
-      root.style.setProperty('--bg-base', '#1a0804');
-      root.style.setProperty('--shadow-glow-cyan', '0 0 30px rgba(255, 153, 0, 0.25)');
-    }
+    // Keep core UI tokens rock-solid & clean so song changes never disrupt UI/UX buttons or layout
   }
+
 
 
   initParticles() {

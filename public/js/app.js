@@ -668,8 +668,19 @@ document.addEventListener('DOMContentLoaded', () => {
           targetMasterTime: msg.targetMasterTime,
           sourceType: msg.sourceType
         };
+        if (timeCurrent) timeCurrent.textContent = formatTime(msg.position);
         if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
-          if (ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(msg.position, true);
+          if (ytPlayer && ytPlayer.seekTo) {
+            ytPlayer.seekTo(msg.position, true);
+            if (msg.isPlaying && ytPlayer.playVideo && ytPlayer.getPlayerState && ytPlayer.getPlayerState() !== 1) {
+              ytPlayer.playVideo();
+              setPlayButtonState(true);
+            }
+          }
+          const dur = (ytPlayer && ytPlayer.getDuration && ytPlayer.getDuration() > 0) ? ytPlayer.getDuration() : (currentTrack ? (currentTrack.duration || 180) : 180);
+          if (progressFill && dur > 0) {
+            progressFill.style.width = `${Math.min(100, Math.max(0, (msg.position / dur) * 100)).toFixed(1)}%`;
+          }
         } else if (currentTrack && currentTrack.url) {
           if (msg.isPlaying) {
             audioEngine.init().then(() => {
@@ -684,9 +695,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(err => console.warn('[SyncPulse] Seek error:', err));
           } else {
             audioEngine.pause(msg.position);
+            if (progressFill && audioEngine.currentBuffer) {
+              progressFill.style.width = `${Math.min(100, Math.max(0, (msg.position / audioEngine.currentBuffer.duration) * 100)).toFixed(1)}%`;
+            }
           }
         }
         break;
+
 
 
       case 'track_changed':
@@ -973,35 +988,91 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    progressBar.addEventListener('click', (e) => {
+    let isUserScrubbing = false;
+
+    function handleScrub(clientX) {
       if (myRole === 'guest') {
         showToast('🔒 Playback position is controlled by Host');
-        return;
+        return null;
       }
-      if (!currentTrack) return;
+      if (!currentTrack || !progressBar) return null;
       const rect = progressBar.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
+      if (rect.width <= 0) return null;
+      const clickX = clientX - rect.left;
       const frac = Math.max(0, Math.min(1, clickX / rect.width));
 
+      let dur = 180;
       if (currentTrack.type === 'youtube') {
-        const dur = ytPlayer && ytPlayer.getDuration ? ytPlayer.getDuration() : 100;
-        const targetPos = frac * dur;
-        ws.send(JSON.stringify({
-          type: 'seek_cue',
-          position: targetPos,
-          sourceType: 'youtube',
-          leadTime: 600
-        }));
+        dur = (ytPlayer && ytPlayer.getDuration && ytPlayer.getDuration() > 0)
+          ? ytPlayer.getDuration()
+          : (currentTrack.duration || 180);
       } else if (audioEngine.currentBuffer) {
-        const targetPos = frac * audioEngine.currentBuffer.duration;
+        dur = audioEngine.currentBuffer.duration || 180;
+      }
+
+      const targetPos = frac * dur;
+
+      // Immediate optimistic UI update
+      if (progressFill) progressFill.style.width = `${(frac * 100).toFixed(1)}%`;
+      if (timeCurrent) timeCurrent.textContent = formatTime(targetPos);
+
+      return { targetPos, dur };
+    }
+
+    function commitScrub(clientX) {
+      const res = handleScrub(clientX);
+      if (!res) return;
+      const { targetPos } = res;
+
+      const isPlaying = (currentTrack.type === 'youtube')
+        ? (ytPlayer && ytPlayer.getPlayerState ? ytPlayer.getPlayerState() === 1 : (pendingPlaybackState ? pendingPlaybackState.isPlaying : true))
+        : audioEngine.isPlaying;
+
+      if (currentTrack.type === 'youtube') {
+        if (ytPlayer && ytPlayer.seekTo) {
+          ytPlayer.seekTo(targetPos, true);
+        }
+      } else {
+        audioEngine.pausedPosition = targetPos;
+        audioEngine.playStartPosition = targetPos;
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'seek_cue',
           position: targetPos,
-          sourceType: 'audio',
-          leadTime: 600
+          isPlaying: isPlaying,
+          sourceType: currentTrack.type || 'youtube',
+          leadTime: 200
         }));
       }
+    }
+
+    progressBar.addEventListener('pointerdown', (e) => {
+      if (myRole === 'guest') return;
+      isUserScrubbing = true;
+      handleScrub(e.clientX);
     });
+
+    window.addEventListener('pointermove', (e) => {
+      if (isUserScrubbing) {
+        handleScrub(e.clientX);
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (isUserScrubbing) {
+        isUserScrubbing = false;
+        commitScrub(e.clientX);
+      }
+    });
+
+    progressBar.addEventListener('click', (e) => {
+      if (!isUserScrubbing) {
+        commitScrub(e.clientX);
+      }
+    });
+
 
     modeButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1112,50 +1183,10 @@ document.addEventListener('DOMContentLoaded', () => {
       isMuted = val === 0;
     });
 
-    btnUploadTrigger.addEventListener('click', () => fileUploadInput.click());
-
-    fileUploadInput.addEventListener('change', async (e) => {
-      if (myRole === 'guest') {
-        showToast('🔒 Only Host can upload tracks');
-        return;
-      }
-
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append('audio', file);
-      formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
-      formData.append('artist', 'Offline File Sync');
-
-      showToast('⏳ Uploading local file for multi-device sync...');
-      try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (data.success) {
-          tracks.unshift(data.track);
-          currentTrack = data.track;
-          renderTrackShelf();
-          updateTrackUi(currentTrack);
-          await audioEngine.loadTrack(currentTrack.url);
-          ws.send(JSON.stringify({
-            type: 'change_track',
-            track: currentTrack,
-            autoplay: true
-          }));
-          showToast('🎵 Track loaded & synchronized across all phones!');
-        }
-      } catch (err) {
-        showToast('Error loading local audio file');
-      }
-    });
-
     setupCalibrator();
     requestAnimationFrame(updatePlaybackProgress);
   }
+
 
   function setupDjMic() {
     if (!btnDjMic) return;
@@ -1356,12 +1387,24 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchYouTubeResults(q);
   }
 
+  const ytClientCache = new Map();
+
   async function fetchYouTubeResults(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return;
+
+    if (ytClientCache.has(q)) {
+      renderYouTubeResults(ytClientCache.get(q));
+      return;
+    }
+
     ytResultsScroll.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">Searching YouTube...</div>';
     try {
       const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
-      renderYouTubeResults(data.results || []);
+      const results = data.results || [];
+      ytClientCache.set(q, results);
+      renderYouTubeResults(results);
     } catch (e) {
       ytResultsScroll.innerHTML = '<div style="font-size:0.75rem; color:var(--neon-red); text-align:center;">Search failed</div>';
     }
@@ -1433,8 +1476,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = '';
     ytPlayer = new YT.Player(container, {
-      height: '0',
-      width: '0',
+      height: '200',
+      width: '200',
       videoId: videoId,
       playerVars: {
         playsinline: 1,
@@ -1558,7 +1601,7 @@ document.addEventListener('DOMContentLoaded', () => {
     offsetSlider.value = calibrator.offsetMs;
     offsetValDisplay.textContent = `${calibrator.offsetMs > 0 ? '+' : ''}${Math.round(calibrator.offsetMs)} ms`;
 
-    // Wire Continuous Latency Auto-Corrector Listener (Checks & Fixes every 5s)
+    // Wire Continuous Latency Auto-Corrector Listener (Checks & Fixes every 2s)
     audioEngine.onAutoSyncStatus((status) => {
       if (status.state === 'locked') {
         if (autoSyncStatusBadge) {
@@ -1570,7 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
           autoSyncLivePill.textContent = `Phase-Locked (±${Math.abs(status.driftMs)}ms)`;
         }
         if (autoSyncDetailText) {
-          autoSyncDetailText.textContent = `All devices in exact millisecond phase-lock! (Drift: ±${Math.abs(status.driftMs)}ms). 5-sec monitor active.`;
+          autoSyncDetailText.textContent = `All devices in exact millisecond phase-lock! (Drift: ±${Math.abs(status.driftMs)}ms). 2-sec monitor active.`;
         }
       } else if (status.state === 'fixing') {
         if (autoSyncStatusBadge) {
@@ -1603,7 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleAutoSync.addEventListener('change', () => {
         const active = toggleAutoSync.checked;
         audioEngine.setAutoSyncActive(active);
-        showToast(active ? '⚡ Continuous 5s Auto-Sync: ENABLED' : '⚡ Continuous Auto-Sync: DISABLED');
+        showToast(active ? '⚡ Continuous 2s Auto-Sync: ENABLED' : '⚡ Continuous Auto-Sync: DISABLED');
       });
     }
 
@@ -1618,21 +1661,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   function updatePlaybackProgress() {
+    if (typeof isUserScrubbing !== 'undefined' && isUserScrubbing) {
+      requestAnimationFrame(updatePlaybackProgress);
+      return;
+    }
+
     if (currentTrack && currentTrack.type === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) {
       const pos = ytPlayer.getCurrentTime() || 0;
-      const dur = ytPlayer.getDuration() || 1;
+      const dur = (ytPlayer.getDuration && ytPlayer.getDuration() > 0) ? ytPlayer.getDuration() : (currentTrack.duration || 180);
       const pct = (pos / dur) * 100;
       progressFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
     } else if (audioEngine.currentBuffer) {
       const pos = audioEngine.getCurrentPlaybackPosition();
-      const dur = audioEngine.currentBuffer.duration || 1;
+      const dur = audioEngine.currentBuffer.duration || 180;
       const pct = (pos / dur) * 100;
       progressFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
     }
+
 
 
     if (vuBarLeft && vuBarRight) {
@@ -1679,7 +1728,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderTrackShelf() {
+    if (!trackListContainer) return;
     trackListContainer.innerHTML = '';
+
     tracks.forEach(track => {
       const capsule = document.createElement('div');
       capsule.className = `track-capsule ${currentTrack && currentTrack.id === track.id ? 'active' : ''}`;

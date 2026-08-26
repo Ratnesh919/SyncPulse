@@ -832,10 +832,17 @@ body {
 
 .scrub-track {
   position: relative;
-  height: 6px;
+  height: 8px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-full);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scrub-track:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .scrub-fill {
@@ -850,16 +857,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  pointer-events: none;
 }
 
 .scrub-handle {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 8px var(--neon-cyan);
-  transform: translateX(4px);
+  box-shadow: 0 0 10px var(--neon-cyan);
+  transform: translateX(6px);
+  pointer-events: none;
 }
+
 
 .scrub-timestamps {
   display: flex;
@@ -1153,8 +1163,17 @@ body {
 }
 
 #youtube-player-container {
-  display: none;
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  width: 200px;
+  height: 200px;
+  opacity: 0.001;
+  pointer-events: none;
+  z-index: -100;
+  visibility: visible;
 }
+
 
 /* Placement Modal */
 .placement-stage-card {

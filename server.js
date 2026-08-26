@@ -17,34 +17,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Multer storage for uploaded audio (offline local sync)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const cleanName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-    cb(null, `${Date.now()}_${cleanName}${ext}`);
-  }
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.originalname)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only audio files are allowed!'));
+// Cache static files for fast loading on low-speed internet
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  setHeaders: (res, path) => {
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
     }
   }
-});
+}));
 
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();
@@ -68,48 +50,28 @@ function getServerMasterTime() {
   return serverEpochBase + getPreciseTimeMs();
 }
 
-// Demo Presets
-const DEMO_TRACKS = [
-  {
-    id: 'demo-cyberpunk-pulse',
-    title: 'Neon Cyberpunk Bassline',
-    artist: 'SyncPulse Studio (Synthesized)',
-    duration: 32,
-    url: '/demo/cyberpunk_pulse.wav',
-    bpm: 128,
-    isPreset: true,
-    type: 'audio'
-  },
-  {
-    id: 'demo-metronome-calibrator',
-    title: 'Precision Acoustic Click 120 BPM',
-    artist: 'Hardware Latency Reference',
-    duration: 60,
-    url: '/demo/click_reference.wav',
-    bpm: 120,
-    isPreset: true,
-    type: 'audio'
-  },
-  {
-    id: 'demo-lofi-drift',
-    title: 'Midnight Lo-Fi Chord Groove',
-    artist: 'SyncPulse Studio (Synthesized)',
-    duration: 45,
-    url: '/demo/lofi_groove.wav',
-    bpm: 90,
-    isPreset: true,
-    type: 'audio'
-  }
-];
+// Default Starting Track (YouTube Cloud Stream)
+const DEFAULT_TRACK = {
+  id: 'yt-jfKfPfyJRdk',
+  title: 'Lofi Hip Hop Radio - Beats to Relax/Study to',
+  artist: 'Lofi Girl',
+  duration: 240,
+  type: 'youtube',
+  youtubeVideoId: 'jfKfPfyJRdk'
+};
 
 const rooms = new Map();
+
+// In-Memory Search Cache for Low Internet Speed & Instant Results (15 min TTL)
+const ytSearchCache = new Map();
+const SEARCH_CACHE_TTL = 15 * 60 * 1000;
 
 // API: Server Info
 app.get('/api/server-info', (req, res) => {
   res.json({
     ips: getLocalIpAddresses(),
     port: PORT,
-    tracks: DEMO_TRACKS,
+    tracks: [DEFAULT_TRACK],
     serverTime: getServerMasterTime()
   });
 });
@@ -130,10 +92,16 @@ app.get('/api/qr', async (req, res) => {
   }
 });
 
-// API: YouTube Mini Search
+// API: YouTube Mini Search with Instant Caching
 app.get('/api/youtube/search', (req, res) => {
-  const query = req.query.q;
+  const query = (req.query.q || '').trim();
   if (!query) return res.json({ results: [] });
+
+  const cacheKey = query.toLowerCase();
+  const cached = ytSearchCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < SEARCH_CACHE_TTL)) {
+    return res.json({ results: cached.results });
+  }
 
   const searchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
   const options = {
@@ -169,6 +137,7 @@ app.get('/api/youtube/search', (req, res) => {
             if (results.length >= 10) break;
           }
         }
+        ytSearchCache.set(cacheKey, { results, timestamp: Date.now() });
         res.json({ results });
       } catch (err) {
         console.error('YouTube Search Parse Error:', err);
@@ -177,27 +146,11 @@ app.get('/api/youtube/search', (req, res) => {
     });
   }).on('error', (err) => {
     console.error('YouTube Search Request Error:', err);
-    res.json({ results: [] });
   });
 });
 
-// API: Upload Custom Audio File (Offline Direct Storage)
-app.post('/api/upload', upload.single('audio'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No audio file uploaded' });
-  const track = {
-    id: `upload-${Date.now()}`,
-    title: req.body.title || req.file.originalname.replace(/\.[^/.]+$/, ''),
-    artist: req.body.artist || 'Offline Device Sync',
-    url: `/uploads/${req.file.filename}`,
-    filename: req.file.filename,
-    isPreset: false,
-    type: 'audio',
-    size: req.file.size
-  };
-  res.json({ success: true, track });
-});
-
 // WebSocket Protocol Handlers
+
 wss.on('connection', (ws) => {
   let currentRoomId = null;
   let peerId = `node_${Math.random().toString(36).substring(2, 9)}`;
@@ -230,20 +183,21 @@ wss.on('connection', (ws) => {
               id: currentRoomId,
               hostWs: role === 'host' ? ws : null,
               peers: new Map(),
-              currentTrack: DEMO_TRACKS[0],
+              currentTrack: DEFAULT_TRACK,
               spatialMode: 'normal', // 'normal', '8d', 'dolby'
               playbackState: {
                 isPlaying: false,
                 position: 0,
                 targetMasterTime: 0,
                 playbackRate: 1.0,
-                sourceType: 'audio', // 'audio' or 'youtube'
-                youtubeVideoId: null,
+                sourceType: 'youtube', // default to cloud YouTube
+                youtubeVideoId: DEFAULT_TRACK.youtubeVideoId,
                 autoplay: false
               },
               created: Date.now()
             });
           }
+
 
           const room = rooms.get(currentRoomId);
           if (role === 'host' && !room.hostWs) {
@@ -361,10 +315,13 @@ wss.on('connection', (ws) => {
         case 'seek_cue': {
           const room = rooms.get(currentRoomId);
           if (room && (room.hostWs === ws || msg.isHostOverride)) {
-            const leadTime = msg.leadTime || 600;
+            const leadTime = Math.min(msg.leadTime || 250, 300);
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime - (msg.position * 1000);
             room.playbackState.position = msg.position;
+            if (msg.isPlaying !== undefined) {
+              room.playbackState.isPlaying = !!msg.isPlaying;
+            }
             room.playbackState.targetMasterTime = targetMasterTime;
             room.playbackState.roomMasterStartTime = roomMasterStartTime;
 
@@ -388,10 +345,10 @@ wss.on('connection', (ws) => {
             room.currentTrack = msg.track;
             room.playbackState.position = 0;
             room.playbackState.isPlaying = msg.autoplay || false;
-            room.playbackState.sourceType = msg.track.type || 'audio';
+            room.playbackState.sourceType = msg.track.type || 'youtube';
             room.playbackState.youtubeVideoId = msg.track.youtubeVideoId || null;
 
-            const leadTime = 800;
+            const leadTime = 400; // fast 400ms lead time
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime;
             room.playbackState.targetMasterTime = targetMasterTime;
@@ -408,6 +365,7 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
 
 
         // Host: Set Spatial Sound Mode (Host Only)
@@ -615,123 +573,7 @@ function broadcastRoomPeers(room) {
   });
 }
 
-function generateDemoWavs() {
-  const demoDir = path.join(__dirname, 'public', 'demo');
-  if (!fs.existsSync(demoDir)) {
-    fs.mkdirSync(demoDir, { recursive: true });
-  }
-
-  const synthPath = path.join(demoDir, 'cyberpunk_pulse.wav');
-  if (!fs.existsSync(synthPath)) {
-    fs.writeFileSync(synthPath, createSynthesizedAudio(128, 30, 'synth'));
-  }
-
-  const clickPath = path.join(demoDir, 'click_reference.wav');
-  if (!fs.existsSync(clickPath)) {
-    fs.writeFileSync(clickPath, createSynthesizedAudio(120, 60, 'click'));
-  }
-
-  const lofiPath = path.join(demoDir, 'lofi_groove.wav');
-  if (!fs.existsSync(lofiPath)) {
-    fs.writeFileSync(lofiPath, createSynthesizedAudio(90, 45, 'lofi'));
-  }
-}
-
-function createSynthesizedAudio(bpm, durationSec, style) {
-  const sampleRate = 44100;
-  const numChannels = 2;
-  const totalSamples = sampleRate * durationSec;
-  const byteRate = sampleRate * numChannels * 2;
-  const blockAlign = numChannels * 2;
-  const dataSize = totalSamples * blockAlign;
-
-  const buffer = Buffer.alloc(44 + dataSize);
-
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(36 + dataSize, 4);
-  buffer.write('WAVE', 8);
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(numChannels, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(byteRate, 28);
-  buffer.writeUInt16LE(blockAlign, 32);
-  buffer.writeUInt16LE(16, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(dataSize, 40);
-
-  const beatDuration = 60 / bpm;
-  let offset = 44;
-
-  for (let i = 0; i < totalSamples; i++) {
-    const t = i / sampleRate;
-    const beatPos = (t % beatDuration) / beatDuration;
-    let left = 0;
-    let right = 0;
-
-    if (style === 'click') {
-      if (beatPos < 0.05) {
-        const env = Math.exp(-beatPos * 120);
-        const freq = (Math.floor(t / beatDuration) % 4 === 0) ? 1760 : 880;
-        const sig = Math.sin(2 * Math.PI * freq * t) * env;
-        left = sig;
-        right = sig;
-      }
-    } else if (style === 'synth') {
-      if (beatPos < 0.2) {
-        const kickEnv = Math.exp(-beatPos * 25);
-        const kickFreq = 140 * Math.exp(-beatPos * 30) + 45;
-        const kick = Math.sin(2 * Math.PI * kickFreq * beatPos * beatDuration) * kickEnv;
-        left += kick * 0.8;
-        right += kick * 0.8;
-      }
-      const hatPos = (beatPos + 0.5) % 1.0;
-      if (hatPos < 0.1) {
-        const noise = (Math.random() * 2 - 1) * Math.exp(-hatPos * 60);
-        left += noise * 0.25;
-        right += noise * 0.25;
-      }
-      const noteIdx = Math.floor((t / (beatDuration / 4)) % 16);
-      const bassNotes = [55, 55, 110, 55, 65.4, 65.4, 130.8, 65.4, 49, 49, 98, 49, 43.6, 43.6, 87.3, 73.4];
-      const bassFreq = bassNotes[noteIdx];
-      const bassNoteT = (t % (beatDuration / 4));
-      const bassEnv = Math.exp(-bassNoteT * 12);
-      const bassSaw = ((2 * (bassNoteT * bassFreq % 1)) - 1) * bassEnv * 0.35;
-      left += bassSaw * 0.8;
-      right += bassSaw * 0.8;
-      const pad = (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 329.63 * t) + Math.sin(2 * Math.PI * 440 * t)) * 0.08;
-      left += pad * 0.7;
-      right += pad * 0.9;
-    } else if (style === 'lofi') {
-      const chordRoots = [261.63, 220, 174.61, 196];
-      const chordIdx = Math.floor(t / (beatDuration * 4)) % 4;
-      const root = chordRoots[chordIdx];
-      const chord = (Math.sin(2 * Math.PI * root * t) + Math.sin(2 * Math.PI * (root * 1.25) * t) + Math.sin(2 * Math.PI * (root * 1.5) * t)) * 0.15;
-      const crackle = (Math.random() > 0.985 ? (Math.random() * 2 - 1) * 0.12 : 0);
-      const beatNum = Math.floor(t / beatDuration) % 4;
-      if ((beatNum === 0 || beatNum === 2) && beatPos < 0.25) {
-        const softKick = Math.sin(2 * Math.PI * 65 * beatPos * beatDuration) * Math.exp(-beatPos * 16) * 0.5;
-        left += softKick;
-        right += softKick;
-      }
-      left += chord + crackle;
-      right += chord * 0.95 + crackle;
-    }
-
-    const lClamped = Math.max(-1, Math.min(1, left));
-    const rClamped = Math.max(-1, Math.min(1, right));
-    buffer.writeInt16LE(Math.floor(lClamped * 32767), offset);
-    buffer.writeInt16LE(Math.floor(rClamped * 32767), offset + 2);
-    offset += 4;
-  }
-
-  return buffer;
-}
-
-generateDemoWavs();
-
-// Periodic Room Master Sync Pulse (every 5 seconds)
+// Periodic Room Master Sync Pulse (every 2 seconds)
 setInterval(() => {
   const nowMs = getServerMasterTime();
   for (const [roomId, room] of rooms.entries()) {
@@ -748,10 +590,9 @@ setInterval(() => {
       });
     }
   }
-}, 5000);
+}, 2000);
 
 server.listen(PORT, () => {
-
   console.log(`\n======================================================`);
   console.log(`🚀 SyncPulse Synchronized Spatial Audio Server Running!`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);
@@ -761,3 +602,4 @@ server.listen(PORT, () => {
   }
   console.log(`======================================================\n`);
 });
+
