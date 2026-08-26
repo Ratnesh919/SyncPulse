@@ -184,6 +184,8 @@ wss.on('connection', (ws) => {
               hostWs: role === 'host' ? ws : null,
               peers: new Map(),
               currentTrack: DEFAULT_TRACK,
+              queue: [], // Collaborative Democratic Party Jukebox Queue
+              crossfadeSec: 4, // Auto-DJ Crossfade seconds (0 = off)
               spatialMode: 'normal', // 'normal', '8d', 'dolby'
               playbackState: {
                 isPlaying: false,
@@ -198,8 +200,8 @@ wss.on('connection', (ws) => {
             });
           }
 
-
           const room = rooms.get(currentRoomId);
+          if (!room.queue) room.queue = [];
           if (role === 'host' && !room.hostWs) {
             room.hostWs = ws;
           }
@@ -249,10 +251,13 @@ wss.on('connection', (ws) => {
             roomId: currentRoomId,
             role: peerInfo.role,
             currentTrack: room.currentTrack,
+            queue: room.queue,
+            crossfadeSec: room.crossfadeSec || 4,
             spatialMode: room.spatialMode,
             playbackState: livePlaybackState,
             serverTime: getServerMasterTime()
           }));
+
 
           broadcastRoomPeers(room);
           break;
@@ -531,7 +536,149 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
+        // Collaborative Democratic Jukebox: Add Song to Queue
+        case 'queue_add': {
+          const room = rooms.get(currentRoomId);
+          if (!room || !msg.track) break;
+          const peer = room.peers.get(ws);
+          const peerName = peer ? peer.deviceName : 'Guest Node';
+          if (!room.queue) room.queue = [];
+
+          const trackId = msg.track.youtubeVideoId || msg.track.id;
+          const existing = room.queue.find(item =>
+            (item.track.youtubeVideoId && item.track.youtubeVideoId === trackId) ||
+            (item.track.id && item.track.id === trackId)
+          );
+
+          if (existing) {
+            if (!existing.upvoterIds.includes(peerId)) {
+              existing.upvoterIds.push(peerId);
+              existing.downvoterIds = existing.downvoterIds.filter(id => id !== peerId);
+              existing.votes = existing.upvoterIds.length - existing.downvoterIds.length;
+            }
+          } else {
+            const queueItem = {
+              queueId: `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              track: msg.track,
+              votes: 1,
+              upvoterIds: [peerId],
+              downvoterIds: [],
+              addedBy: peerName,
+              addedByPeerId: peerId,
+              timestamp: Date.now()
+            };
+            room.queue.push(queueItem);
+          }
+
+          room.queue.sort((a, b) => b.votes - a.votes || a.timestamp - b.timestamp);
+          broadcastToRoom(room, {
+            type: 'queue_updated',
+            queue: room.queue
+          });
+          break;
+        }
+
+        // Collaborative Democratic Jukebox: Upvote / Downvote
+        case 'queue_vote': {
+          const room = rooms.get(currentRoomId);
+          if (!room || !room.queue) break;
+          const item = room.queue.find(q => q.queueId === msg.queueId);
+          if (!item) break;
+
+          if (msg.direction === 'up') {
+            if (item.upvoterIds.includes(peerId)) {
+              item.upvoterIds = item.upvoterIds.filter(id => id !== peerId);
+            } else {
+              item.upvoterIds.push(peerId);
+              item.downvoterIds = item.downvoterIds.filter(id => id !== peerId);
+            }
+          } else if (msg.direction === 'down') {
+            if (item.downvoterIds.includes(peerId)) {
+              item.downvoterIds = item.downvoterIds.filter(id => id !== peerId);
+            } else {
+              item.downvoterIds.push(peerId);
+              item.upvoterIds = item.upvoterIds.filter(id => id !== peerId);
+            }
+          }
+
+          item.votes = item.upvoterIds.length - item.downvoterIds.length;
+          room.queue.sort((a, b) => b.votes - a.votes || a.timestamp - b.timestamp);
+
+          broadcastToRoom(room, {
+            type: 'queue_updated',
+            queue: room.queue
+          });
+          break;
+        }
+
+        // Collaborative Jukebox: Remove Queue Item
+        case 'queue_remove': {
+          const room = rooms.get(currentRoomId);
+          if (!room || !room.queue) break;
+          const isHost = room.hostWs === ws;
+          room.queue = room.queue.filter(q => {
+            if (q.queueId === msg.queueId) {
+              return !(isHost || q.addedByPeerId === peerId);
+            }
+            return true;
+          });
+          broadcastToRoom(room, {
+            type: 'queue_updated',
+            queue: room.queue
+          });
+          break;
+        }
+
+        // Collaborative Jukebox: Play Next Queued Song (Host or Auto-DJ)
+        case 'queue_pop_next': {
+          const room = rooms.get(currentRoomId);
+          if (!room || !room.queue || room.queue.length === 0) break;
+          if (room.hostWs !== ws && !msg.isAutoTransition) break;
+
+          const nextItem = room.queue.shift();
+          room.currentTrack = nextItem.track;
+          room.playbackState.position = 0;
+          room.playbackState.isPlaying = true;
+          room.playbackState.sourceType = nextItem.track.type || 'youtube';
+          room.playbackState.youtubeVideoId = nextItem.track.youtubeVideoId || null;
+
+          const leadTime = 400;
+          const targetMasterTime = getServerMasterTime() + leadTime;
+          room.playbackState.targetMasterTime = targetMasterTime;
+          room.playbackState.roomMasterStartTime = targetMasterTime;
+
+          broadcastToRoom(room, {
+            type: 'track_changed',
+            track: nextItem.track,
+            autoplay: true,
+            targetMasterTime,
+            roomMasterStartTime: targetMasterTime,
+            crossfadeSec: msg.crossfadeSec || room.crossfadeSec || 0,
+            serverTime: getServerMasterTime()
+          });
+
+          broadcastToRoom(room, {
+            type: 'queue_updated',
+            queue: room.queue
+          });
+          break;
+        }
+
+        // Host: Auto-DJ Crossfade Setting
+        case 'set_crossfade': {
+          const room = rooms.get(currentRoomId);
+          if (room && room.hostWs === ws) {
+            room.crossfadeSec = typeof msg.crossfadeSec === 'number' ? msg.crossfadeSec : 4;
+            broadcastToRoom(room, {
+              type: 'crossfade_updated',
+              crossfadeSec: room.crossfadeSec
+            });
+          }
+          break;
+        }
       }
+
 
 
     } catch (err) {

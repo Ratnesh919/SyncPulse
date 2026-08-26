@@ -2062,3 +2062,435 @@ body {
   .studio-trio-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .mini-youtube-panel { height: 300px; }
 }
+
+/* ==========================================================================
+   AUTO-DJ CROSSFADE, 24/7 RADIO STATIONS & DEMOCRATIC PARTY JUKEBOX
+   ========================================================================== */
+
+/* Auto-DJ Crossfade Selector */
+.crossfade-rack-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.crossfade-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.crossfade-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crossfade-sub {
+  font-size: 0.62rem;
+  color: var(--text-tertiary);
+}
+
+.crossfade-pills {
+  display: flex;
+  gap: 4px;
+}
+
+.crossfade-btn {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.crossfade-btn:hover {
+  background: rgba(0, 242, 254, 0.15);
+  color: #fff;
+}
+
+.crossfade-btn.active {
+  background: var(--neon-cyan);
+  color: #030509;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan-glow);
+}
+
+/* 24/7 Live Soundstage Radio Stations Shelf */
+.live-radio-shelf {
+  margin-top: 14px;
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radio-shelf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.radio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.radio-hint {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.radio-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.radio-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--transition-medium);
+}
+
+.radio-card:hover {
+  background: rgba(255, 0, 127, 0.08);
+  border-color: var(--neon-magenta);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 0, 127, 0.15);
+}
+
+.radio-card.active {
+  background: rgba(0, 242, 254, 0.12);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 14px var(--neon-cyan-glow);
+}
+
+.radio-card-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.radio-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.radio-card-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.radio-card-desc {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.radio-play-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.radio-card:hover .radio-play-btn {
+  background: var(--neon-magenta);
+  color: #fff;
+  box-shadow: 0 0 8px var(--neon-magenta-glow);
+}
+
+/* Jukebox Queue Panel */
+.jukebox-workbench {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.jukebox-header-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.jukebox-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--neon-green);
+  letter-spacing: 0.5px;
+}
+
+.jukebox-search-form {
+  display: flex;
+  gap: 8px;
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.jukebox-queue-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.queue-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.queue-card-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.queue-card-sub {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.jukebox-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.queue-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-md);
+}
+
+.queue-item-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.queue-item-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-medium);
+}
+
+.queue-item-card.rank-1 {
+  background: linear-gradient(90deg, rgba(0, 242, 254, 0.08), rgba(255, 255, 255, 0.03));
+  border-color: rgba(0, 242, 254, 0.35);
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.1);
+}
+
+.queue-rank-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.queue-item-card.rank-1 .queue-rank-badge {
+  background: var(--neon-cyan);
+  color: #030509;
+  box-shadow: 0 0 8px var(--neon-cyan-glow);
+}
+
+.queue-item-thumb {
+  width: 48px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.queue-item-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-details {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.queue-vote-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.btn-vote {
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: transform 0.15s ease;
+  line-height: 1;
+}
+
+.btn-vote:hover {
+  transform: scale(1.25);
+}
+
+.btn-vote.active-up {
+  filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8));
+}
+
+.btn-vote.active-down {
+  filter: drop-shadow(0 0 6px rgba(0, 150, 255, 0.8));
+}
+
+.vote-score {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 22px;
+  text-align: center;
+  color: var(--neon-cyan);
+}
+
+.btn-queue-action {
+  padding: 5px 8px;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.btn-queue-action:hover {
+  background: rgba(255, 0, 0, 0.15);
+  border-color: var(--neon-red);
+  color: #fff;
+}
+
+.btn-card-add-queue {
+  padding: 3px 7px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  border-radius: var(--radius-xs);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.btn-card-add-queue:hover {
+  background: var(--neon-cyan);
+  color: #030509;
+}
+

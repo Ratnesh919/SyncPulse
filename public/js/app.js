@@ -129,7 +129,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleAutoSync = document.getElementById('toggle-auto-sync');
   const btnForceAutoSync = document.getElementById('btn-force-auto-sync');
 
+  // Collaborative Jukebox Queue Elements
+  const queueBadge = document.getElementById('queue-badge');
+  const queueCountDisplay = document.getElementById('queue-count-display');
+  const jukeboxQueueList = document.getElementById('jukebox-queue-list');
+  const btnJukeboxPlayNext = document.getElementById('btn-jukebox-play-next');
+  const jukeboxSearchInput = document.getElementById('jukebox-search-input');
+  const btnJukeboxSearch = document.getElementById('btn-jukebox-search');
+  const jukeboxSearchResults = document.getElementById('jukebox-search-results');
 
+  // Auto-DJ Crossfade Elements
+  const crossfadeButtons = document.querySelectorAll('.crossfade-btn');
+
+  // 24/7 Live Radio Stations Elements
+  const radioCards = document.querySelectorAll('.radio-card');
 
   // Core Engines
   let ws = null;
@@ -149,6 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let pendingPlaybackState = null;
   let unreadChatCount = 0;
   let activeTabName = 'studio';
+
+  // Collaborative Jukebox & Auto-DJ Crossfade State
+  let currentQueue = [];
+  let crossfadeDuration = 4; // seconds (0 = off)
+  let isCrossfading = false;
 
   // YouTube Player State
   let ytPlayer = null;
@@ -174,6 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLiveChat();
     setupDjMic();
     setupEqualizerControls();
+    setupCrossfadeControls();
+    setupRadioStations();
+    setupJukeboxQueue();
+
     
     // Parse URL room code
     const urlParams = new URLSearchParams(window.location.search);
@@ -337,10 +359,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (chatMessagesContainer) {
             chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
           }
+        } else if (targetTab === 'jukebox') {
+          if (queueBadge) queueBadge.style.display = 'none';
         }
       });
     });
   }
+
 
   function setupLiveChat() {
     if (chatForm) {
@@ -586,9 +611,20 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTrackUi(currentTrack);
         }
 
+        if (msg.queue) {
+          currentQueue = msg.queue;
+          renderJukeboxQueue();
+        }
+
+        if (typeof msg.crossfadeSec === 'number') {
+          crossfadeDuration = msg.crossfadeSec;
+          updateCrossfadeUi();
+        }
+
         if (msg.playbackState && msg.playbackState.roomMasterStartTime) {
           audioEngine.setRoomMasterStartTime(msg.playbackState.roomMasterStartTime);
         }
+
 
         if (msg.playbackState && msg.playbackState.isPlaying && currentTrack) {
           pendingPlaybackState = msg.playbackState;
@@ -825,8 +861,23 @@ document.addEventListener('DOMContentLoaded', () => {
         audioEngine.setEqEnabled(msg.enabled);
         if (msg.preset) audioEngine.setEqPreset(msg.preset);
         break;
+
+      case 'queue_updated':
+        currentQueue = msg.queue || [];
+        renderJukeboxQueue();
+        if (activeTabName !== 'jukebox' && queueBadge) {
+          queueBadge.style.display = currentQueue.length > 0 ? 'inline-block' : 'none';
+          queueBadge.textContent = currentQueue.length;
+        }
+        break;
+
+      case 'crossfade_updated':
+        crossfadeDuration = msg.crossfadeSec;
+        updateCrossfadeUi();
+        break;
     }
   }
+
 
 
 
@@ -1389,31 +1440,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ytClientCache = new Map();
 
-  async function fetchYouTubeResults(query) {
+  async function fetchYouTubeResults(query, targetContainer = ytResultsScroll) {
     const q = (query || '').trim().toLowerCase();
     if (!q) return;
 
     if (ytClientCache.has(q)) {
-      renderYouTubeResults(ytClientCache.get(q));
+      renderYouTubeResults(ytClientCache.get(q), targetContainer);
       return;
     }
 
-    ytResultsScroll.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">Searching YouTube...</div>';
+    if (targetContainer) {
+      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">Searching YouTube...</div>';
+    }
     try {
       const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       const results = data.results || [];
       ytClientCache.set(q, results);
-      renderYouTubeResults(results);
+      renderYouTubeResults(results, targetContainer);
     } catch (e) {
-      ytResultsScroll.innerHTML = '<div style="font-size:0.75rem; color:var(--neon-red); text-align:center;">Search failed</div>';
+      if (targetContainer) {
+        targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--neon-red); text-align:center;">Search failed</div>';
+      }
     }
   }
 
-  function renderYouTubeResults(results) {
-    ytResultsScroll.innerHTML = '';
+  function renderYouTubeResults(results, targetContainer = ytResultsScroll) {
+    if (!targetContainer) return;
+    targetContainer.innerHTML = '';
     if (results.length === 0) {
-      ytResultsScroll.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">No results found. Paste direct link above.</div>';
+      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">No results found. Paste direct link above.</div>';
       return;
     }
 
@@ -1426,18 +1482,45 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="yt-video-title">${item.title}</div>
           <div class="yt-video-channel">${item.channel} • ${item.duration}</div>
         </div>
+        <button class="btn-card-add-queue" title="Add to Collaborative Party Upvote Queue">+ Queue</button>
       `;
+
+      const queueBtn = card.querySelector('.btn-card-add-queue');
+      if (queueBtn) {
+        queueBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addTrackToQueue({
+            id: `yt-${item.id}`,
+            title: item.title,
+            artist: item.channel || 'YouTube',
+            type: 'youtube',
+            youtubeVideoId: item.id,
+            duration: parseDurationToSeconds(item.duration) || 180,
+            thumbnail: item.thumbnail
+          });
+        });
+      }
+
       card.addEventListener('click', () => {
         if (myRole === 'guest') {
-          showToast('🔒 Only Host can queue songs');
+          addTrackToQueue({
+            id: `yt-${item.id}`,
+            title: item.title,
+            artist: item.channel || 'YouTube',
+            type: 'youtube',
+            youtubeVideoId: item.id,
+            duration: parseDurationToSeconds(item.duration) || 180,
+            thumbnail: item.thumbnail
+          });
           return;
         }
         const autoplay = ytAutoplayCheckbox ? ytAutoplayCheckbox.checked : true;
         playCustomYouTubeVideo(item.id, item.title, autoplay);
       });
-      ytResultsScroll.appendChild(card);
+      targetContainer.appendChild(card);
     });
   }
+
 
   function playCustomYouTubeVideo(videoId, title, autoplay) {
     const track = {
@@ -1673,6 +1756,20 @@ document.addEventListener('DOMContentLoaded', () => {
       progressFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
+
+      // Auto-DJ Transition Trigger: When reaching end of track, blend next queued song
+      if (myRole === 'host' && crossfadeDuration > 0 && currentQueue.length > 0 && !isCrossfading) {
+        if (dur > (crossfadeDuration + 4) && pos >= (dur - crossfadeDuration)) {
+          isCrossfading = true;
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_pop_next',
+              crossfadeSec: crossfadeDuration,
+              isAutoTransition: true
+            }));
+          }
+        }
+      }
     } else if (audioEngine.currentBuffer) {
       const pos = audioEngine.getCurrentPlaybackPosition();
       const dur = audioEngine.currentBuffer.duration || 180;
@@ -1680,7 +1777,21 @@ document.addEventListener('DOMContentLoaded', () => {
       progressFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
+
+      if (myRole === 'host' && crossfadeDuration > 0 && currentQueue.length > 0 && !isCrossfading) {
+        if (dur > (crossfadeDuration + 4) && pos >= (dur - crossfadeDuration)) {
+          isCrossfading = true;
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_pop_next',
+              crossfadeSec: crossfadeDuration,
+              isAutoTransition: true
+            }));
+          }
+        }
+      }
     }
+
 
 
 
@@ -1884,6 +1995,228 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3000);
   }
 
+  function parseDurationToSeconds(durStr) {
+    if (!durStr) return 180;
+    if (typeof durStr === 'number') return durStr;
+    const parts = durStr.split(':').map(p => parseInt(p, 10));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return (parts[0] * 60) + parts[1];
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    return 180;
+  }
+
+  function setupCrossfadeControls() {
+    crossfadeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can change Auto-DJ crossfade settings');
+          return;
+        }
+        const cfSec = parseInt(btn.dataset.cf, 10);
+        crossfadeDuration = cfSec;
+        updateCrossfadeUi();
+        showToast(cfSec === 0 ? '🔀 Auto-DJ Crossfade: DISABLED' : `🔀 Auto-DJ Crossfade: ${cfSec}s Smooth Blend`);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'set_crossfade',
+            crossfadeSec: cfSec
+          }));
+        }
+      });
+    });
+  }
+
+  function updateCrossfadeUi() {
+    crossfadeButtons.forEach(btn => {
+      const cfSec = parseInt(btn.dataset.cf, 10);
+      if (cfSec === crossfadeDuration) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  function setupRadioStations() {
+    radioCards.forEach(card => {
+      card.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can change 24/7 Live Radio stations');
+          return;
+        }
+        const stationId = card.dataset.stationId;
+        const stationTitle = card.dataset.stationTitle;
+        const stationArtist = card.dataset.stationArtist;
+
+        radioCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+
+        playCustomYouTubeVideo(stationId, `${stationTitle} (${stationArtist})`, true);
+        showToast(`📻 Live 24/7 Radio Tuned: ${stationTitle}`);
+      });
+    });
+  }
+
+  function setupJukeboxQueue() {
+    if (btnJukeboxPlayNext) {
+      btnJukeboxPlayNext.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can force play next queued song');
+          return;
+        }
+        if (currentQueue.length === 0) {
+          showToast('🗳️ Queue is empty! Add songs first.');
+          return;
+        }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'queue_pop_next',
+            crossfadeSec: crossfadeDuration
+          }));
+        }
+      });
+    }
+
+    if (btnJukeboxSearch && jukeboxSearchInput) {
+      const runJukeboxSearch = () => {
+        const q = jukeboxSearchInput.value.trim();
+        if (!q) return;
+        if (jukeboxSearchResults) {
+          jukeboxSearchResults.style.display = 'flex';
+          fetchYouTubeResults(q, jukeboxSearchResults);
+        }
+      };
+
+      btnJukeboxSearch.addEventListener('click', (e) => {
+        e.preventDefault();
+        runJukeboxSearch();
+      });
+
+      jukeboxSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runJukeboxSearch();
+        }
+      });
+    }
+  }
+
+  function addTrackToQueue(track) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'queue_add',
+        track: track
+      }));
+      showToast(`🗳️ Added to Upvote Queue: ${track.title}`);
+    }
+  }
+
+  function renderJukeboxQueue() {
+    if (queueCountDisplay) queueCountDisplay.textContent = currentQueue.length;
+    if (!jukeboxQueueList) return;
+
+    if (currentQueue.length === 0) {
+      jukeboxQueueList.innerHTML = `
+        <div class="queue-empty-state">
+          <div style="font-size:2rem; margin-bottom:8px;">🗳️</div>
+          <div style="font-weight:600; color:#fff; margin-bottom:4px;">The Party Queue is Empty</div>
+          <div style="font-size:0.75rem; color:var(--text-tertiary);">Search any YouTube song above or in the Studio to add it to the live upvote queue!</div>
+        </div>
+      `;
+      return;
+    }
+
+    jukeboxQueueList.innerHTML = '';
+
+    currentQueue.forEach((item, index) => {
+      const isUpvotedByMe = (item.upvoterIds || []).includes(myPeerId);
+      const isDownvotedByMe = (item.downvoterIds || []).includes(myPeerId);
+      const isRank1 = index === 0;
+
+      const card = document.createElement('div');
+      card.className = `queue-item-card ${isRank1 ? 'rank-1' : ''}`;
+      card.innerHTML = `
+        <div class="queue-rank-badge">${isRank1 ? '👑' : '#' + (index + 1)}</div>
+        <img src="${item.track.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIzNiI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzIyMiIvPjwvc3ZnPg=='}" class="queue-item-thumb" alt="Thumb">
+        <div class="queue-item-meta">
+          <div class="queue-item-title">${item.track.title}</div>
+          <div class="queue-item-details">
+            <span>${item.track.artist || 'YouTube'}</span>
+            <span>•</span>
+            <span style="color:var(--neon-cyan);">Added by ${item.addedBy || 'Guest'}</span>
+          </div>
+        </div>
+        <div class="queue-vote-box">
+          <button class="btn-vote ${isUpvotedByMe ? 'active-up' : ''}" title="Upvote" data-dir="up">🔥</button>
+          <span class="vote-score">${item.votes > 0 ? '+' : ''}${item.votes}</span>
+          <button class="btn-vote ${isDownvotedByMe ? 'active-down' : ''}" title="Downvote" data-dir="down">👎</button>
+        </div>
+        ${myRole === 'host' ? `
+          <button class="btn-queue-action btn-play-now" title="Play Immediately">▶</button>
+          <button class="btn-queue-action btn-remove-item" title="Remove">✕</button>
+        ` : (item.addedByPeerId === myPeerId ? `
+          <button class="btn-queue-action btn-remove-item" title="Remove">✕</button>
+        ` : '')}
+      `;
+
+      // Vote Handlers
+      const btnUp = card.querySelector('.btn-vote[data-dir="up"]');
+      const btnDown = card.querySelector('.btn-vote[data-dir="down"]');
+
+      if (btnUp) {
+        btnUp.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_vote',
+              queueId: item.queueId,
+              direction: 'up'
+            }));
+          }
+        });
+      }
+
+      if (btnDown) {
+        btnDown.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_vote',
+              queueId: item.queueId,
+              direction: 'down'
+            }));
+          }
+        });
+      }
+
+      // Host Play Now handler
+      const btnPlayNow = card.querySelector('.btn-play-now');
+      if (btnPlayNow) {
+        btnPlayNow.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_remove',
+              queueId: item.queueId
+            }));
+            playCustomYouTubeVideo(item.track.youtubeVideoId, item.track.title, true);
+          }
+        });
+      }
+
+      // Remove handler
+      const btnRemove = card.querySelector('.btn-remove-item');
+      if (btnRemove) {
+        btnRemove.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_remove',
+              queueId: item.queueId
+            }));
+          }
+        });
+      }
+
+      jukeboxQueueList.appendChild(card);
+    });
+  }
+
   function createToastContainer() {
     const c = document.createElement('div');
     c.id = 'toast-rack';
@@ -1892,3 +2225,4 @@ document.addEventListener('DOMContentLoaded', () => {
     return c;
   }
 });
+

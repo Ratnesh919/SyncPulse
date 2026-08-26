@@ -20,6 +20,7 @@ class Visualizer3D {
     this.groupSphere = null;
     this.groupTunnel = null;
     this.groupBars = null;
+    this.groupNebula = null;
     this.sphereMesh = null;
     this.originalSpherePositions = null;
     this.coreMesh = null;
@@ -28,6 +29,8 @@ class Visualizer3D {
     this.tunnelGrid = null;
     this.tunnelOrigPositions = null;
     this.equalizerBars = [];
+    this.nebulaPoints = null;
+    this.nebulaOrigPositions = null;
 
     // Fallback 2D Canvas Context
     this.ctx2d = null;
@@ -114,17 +117,21 @@ class Visualizer3D {
     this.groupSphere = new THREE.Group();
     this.groupTunnel = new THREE.Group();
     this.groupBars = new THREE.Group();
+    this.groupNebula = new THREE.Group();
 
     this.buildSphereMode();
     this.buildTunnelMode();
     this.buildBarsMode();
+    this.buildNebulaMode();
 
     this.scene.add(this.groupSphere);
     this.scene.add(this.groupTunnel);
     this.scene.add(this.groupBars);
+    this.scene.add(this.groupNebula);
 
     this.setMode('sphere');
   }
+
 
   buildSphereMode() {
     const sphereGeo = new THREE.IcosahedronGeometry(7.5, 4);
@@ -233,6 +240,57 @@ class Visualizer3D {
     }
   }
 
+  buildNebulaMode() {
+    const pCount = 800;
+    const pGeo = new THREE.BufferGeometry();
+    const pPos = new Float32Array(pCount * 3);
+    const pCols = new Float32Array(pCount * 3);
+
+    this.nebulaOrigPositions = new Float32Array(pCount * 3);
+
+    for (let i = 0; i < pCount; i++) {
+      const idx = i * 3;
+      const arm = i % 3;
+      const angle = (i / pCount) * Math.PI * 8 + (arm * (Math.PI * 2 / 3));
+      const radius = (i / pCount) * 18 + (Math.random() - 0.5) * 4;
+
+      const x = Math.cos(angle) * radius;
+      const y = (Math.random() - 0.5) * 5;
+      const z = Math.sin(angle) * radius;
+
+      pPos[idx] = x;
+      pPos[idx + 1] = y;
+      pPos[idx + 2] = z;
+
+      this.nebulaOrigPositions[idx] = x;
+      this.nebulaOrigPositions[idx + 1] = y;
+      this.nebulaOrigPositions[idx + 2] = z;
+
+      // Cyan / Magenta / Purple galaxy colors
+      if (arm === 0) {
+        pCols[idx] = 0.0; pCols[idx + 1] = 0.95; pCols[idx + 2] = 1.0; // Cyan
+      } else if (arm === 1) {
+        pCols[idx] = 1.0; pCols[idx + 1] = 0.0; pCols[idx + 2] = 0.5; // Magenta
+      } else {
+        pCols[idx] = 0.47; pCols[idx + 1] = 0.16; pCols[idx + 2] = 0.79; // Purple
+      }
+    }
+
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    pGeo.setAttribute('color', new THREE.BufferAttribute(pCols, 3));
+
+    const pMat = new THREE.PointsMaterial({
+      size: 0.75,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.nebulaPoints = new THREE.Points(pGeo, pMat);
+    this.groupNebula.add(this.nebulaPoints);
+  }
+
   initCanvas2D() {
     this.ctx2d = this.canvas.getContext('2d');
     this.handleResize();
@@ -244,6 +302,7 @@ class Visualizer3D {
       if (this.groupSphere) this.groupSphere.visible = (mode === 'sphere');
       if (this.groupTunnel) this.groupTunnel.visible = (mode === 'tunnel');
       if (this.groupBars) this.groupBars.visible = (mode === 'bars');
+      if (this.groupNebula) this.groupNebula.visible = (mode === 'nebula');
 
       if (mode === 'tunnel') {
         this.camera.position.set(0, 2, 22);
@@ -251,12 +310,16 @@ class Visualizer3D {
       } else if (mode === 'bars') {
         this.camera.position.set(0, 14, 24);
         this.camera.lookAt(0, 0, 0);
+      } else if (mode === 'nebula') {
+        this.camera.position.set(0, 16, 22);
+        this.camera.lookAt(0, 0, 0);
       } else {
         this.camera.position.set(0, 3, 26);
         this.camera.lookAt(0, 0, 0);
       }
     }
   }
+
 
   setupInteractions() {
     this.canvas.addEventListener('mousedown', (e) => {
@@ -470,6 +533,41 @@ class Visualizer3D {
       this.groupBars.rotation.y += 0.004;
     }
 
+    // Mode 4: Cosmic Nebula
+    else if (this.currentMode === 'nebula') {
+      if (this.nebulaPoints && this.nebulaOrigPositions) {
+        const posAttr = this.nebulaPoints.geometry.attributes.position;
+        const orig = this.nebulaOrigPositions;
+        const count = posAttr.count;
+
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          const ox = orig[idx];
+          const oy = orig[idx + 1];
+          const oz = orig[idx + 2];
+
+          const dist = Math.sqrt(ox * ox + oz * oz);
+          const fIdx = Math.floor((dist / 20) * fLen) % fLen;
+          const val = hasLiveAudio ? ((freqData[fIdx] || 0) / 255) : 0.2;
+
+          const expansion = 1.0 + (bassEnergy * 0.45) + (val * 0.3);
+          const swirl = (time * 0.4) + (dist * 0.05);
+
+          const curAngle = Math.atan2(oz, ox) + swirl;
+          const curRadius = dist * expansion;
+
+          posAttr.setXYZ(
+            i,
+            Math.cos(curAngle) * curRadius,
+            oy * (1 + val * 2.0) + Math.sin(time * 3 + dist) * (0.5 + bassEnergy),
+            Math.sin(curAngle) * curRadius
+          );
+        }
+        posAttr.needsUpdate = true;
+        this.groupNebula.rotation.y += 0.002 + bassEnergy * 0.008;
+      }
+    }
+
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -594,7 +692,48 @@ class Visualizer3D {
 
       ctx.restore();
     }
+
+    // Mode 4: Cosmic Nebula 2D
+    else if (this.currentMode === 'nebula') {
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // Deep galactic core
+      const coreGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, Math.min(w, h) * (0.35 + bassEnergy * 0.2));
+      coreGrad.addColorStop(0, 'rgba(0, 242, 254, 0.7)');
+      coreGrad.addColorStop(0.3, 'rgba(255, 0, 127, 0.4)');
+      coreGrad.addColorStop(0.7, 'rgba(121, 40, 202, 0.2)');
+      coreGrad.addColorStop(1, 'rgba(3, 5, 9, 0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(w, h) * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Spiral particle galaxy
+      const stars = 90;
+      for (let s = 0; s < stars; s++) {
+        const arm = s % 3;
+        const progress = s / stars;
+        const angle = progress * Math.PI * 6 + this.idleTime * 0.5 + (arm * (Math.PI * 2 / 3));
+        const fIdx = Math.floor(progress * (freqData.length || 64));
+        const val = hasLiveAudio ? ((freqData[fIdx] || 0) / 255) : 0.25;
+
+        const rad = progress * Math.min(w, h) * 0.42 * (1 + bassEnergy * 0.35);
+        const px = Math.cos(angle) * rad;
+        const py = Math.sin(angle) * (rad * 0.65);
+
+        ctx.fillStyle = arm === 0 ? '#00f2fe' : (arm === 1 ? '#ff007f' : '#b800ff');
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5 + val * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
   }
 }
 
 window.Visualizer3D = Visualizer3D;
+
