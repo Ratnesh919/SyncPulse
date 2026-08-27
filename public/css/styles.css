@@ -1086,11 +1086,26 @@ body {
   color: #fff;
 }
 
+.yt-quality-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-left: 2px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
 .yt-icon-svg {
   width: 18px;
   height: 18px;
   fill: var(--neon-youtube);
 }
+
 
 .yt-autoplay-toggle {
   display: flex;

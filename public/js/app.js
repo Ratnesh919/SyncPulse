@@ -1600,6 +1600,20 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(`▶ Queued YouTube: ${title}`);
   }
 
+  // Bandwidth Saver: Enforces 144p ('tiny') / 240p ('small') lowest resolution stream for low internet usage
+  function enforceLowestYouTubeQuality(player) {
+    const p = player || ytPlayer;
+    if (!p) return;
+    try {
+      if (typeof p.setPlaybackQuality === 'function') {
+        p.setPlaybackQuality('tiny'); // 144p resolution (lowest available bandwidth)
+      }
+      if (typeof p.setPlaybackQualityRange === 'function') {
+        p.setPlaybackQualityRange('tiny', 'small'); // Enforce 144p - 240p range
+      }
+    } catch (err) {}
+  }
+
   function initYouTubePlayer(videoId, onReady) {
     if (!window.YT || !window.YT.Player) {
       // YT not loaded yet, retry
@@ -1616,8 +1630,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = '';
     ytPlayer = new YT.Player(container, {
-      height: '200',
-      width: '200',
+      height: '144',
+      width: '144',
       videoId: videoId,
       playerVars: {
         playsinline: 1,
@@ -1627,14 +1641,23 @@ document.addEventListener('DOMContentLoaded', () => {
         fs: 0,
         modestbranding: 1,
         origin: window.location.origin,
-        enablejsapi: 1
+        enablejsapi: 1,
+        suggestedQuality: 'tiny'
       },
       events: {
         onReady: (e) => {
           isYtReady = true;
+          enforceLowestYouTubeQuality(e.target);
           if (onReady) onReady(e);
         },
+        onPlaybackQualityChange: (e) => {
+          // If player automatically tries to upgrade quality on network burst, lock it back to 144p (tiny)
+          if (e.data !== 'tiny' && e.data !== 'small') {
+            enforceLowestYouTubeQuality(e.target);
+          }
+        },
         onStateChange: (event) => {
+          enforceLowestYouTubeQuality(event.target);
           if (event.data === YT.PlayerState.PLAYING) {
             setPlayButtonState(true);
           } else if (event.data === YT.PlayerState.PAUSED) {
@@ -1664,6 +1687,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleYouTubeTrackChange(videoId, autoplay) {
     if (!ytPlayer || !isYtReady) {
       initYouTubePlayer(videoId, () => {
+        enforceLowestYouTubeQuality(ytPlayer);
         if (autoplay && ytPlayer && ytPlayer.playVideo) {
           ytPlayer.playVideo();
           setPlayButtonState(true);
@@ -1671,10 +1695,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } else {
       if (autoplay) {
-        ytPlayer.loadVideoById({ videoId });
+        ytPlayer.loadVideoById({ videoId, suggestedQuality: 'tiny' });
+        enforceLowestYouTubeQuality(ytPlayer);
         setPlayButtonState(true);
       } else {
-        ytPlayer.cueVideoById({ videoId });
+        ytPlayer.cueVideoById({ videoId, suggestedQuality: 'tiny' });
+        enforceLowestYouTubeQuality(ytPlayer);
       }
     }
   }
@@ -1682,6 +1708,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleYouTubePlayCue(videoId, startPos) {
     if (!ytPlayer || !isYtReady) {
       initYouTubePlayer(videoId, () => {
+        enforceLowestYouTubeQuality(ytPlayer);
         if (ytPlayer && ytPlayer.playVideo) {
           if (startPos > 0) ytPlayer.seekTo(startPos, true);
           ytPlayer.playVideo();
@@ -1691,9 +1718,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       if (startPos > 0) ytPlayer.seekTo(startPos, true);
       ytPlayer.playVideo();
+      enforceLowestYouTubeQuality(ytPlayer);
       setPlayButtonState(true);
     }
   }
+
 
   function setupCalibrator() {
     if (btnAutoCalibrate) {
