@@ -853,8 +853,11 @@
     </div>
   </div>
 
-  <!-- Hidden YouTube Player Container -->
-  <div id="youtube-player-container"></div>
+  <!-- Hidden YouTube Player Wrapper and Container -->
+  <div id="youtube-player-wrapper" style="position:fixed; top:-9999px; left:-9999px; width:200px; height:200px; opacity:0.001; pointer-events:none; z-index:-100;">
+    <div id="youtube-player-container"></div>
+  </div>
+
 
   <!-- Client Application Scripts -->
   <script src="/js/atmosphereEngine.js"></script>

@@ -149,6 +149,18 @@ app.get('/api/youtube/search', (req, res) => {
   });
 });
 
+function isHostSender(room, ws, msg) {
+  if (!room) return false;
+  if (msg && msg.isHostOverride) return true;
+  if (room.hostWs === ws) return true;
+  const peer = room.peers.get(ws);
+  if (peer && peer.role === 'host') {
+    room.hostWs = ws;
+    return true;
+  }
+  return false;
+}
+
 // WebSocket Protocol Handlers
 
 wss.on('connection', (ws) => {
@@ -202,9 +214,10 @@ wss.on('connection', (ws) => {
 
           const room = rooms.get(currentRoomId);
           if (!room.queue) room.queue = [];
-          if (role === 'host' && !room.hostWs) {
+          if (role === 'host') {
             room.hostWs = ws;
           }
+
 
           // Evict stale connections from same device (by deviceName) to prevent ghost peers
           if (deviceName) {
@@ -267,7 +280,7 @@ wss.on('connection', (ws) => {
         // Host: Play Cue Trigger (Host Only)
         case 'play_cue': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             const leadTime = msg.leadTime || 800;
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime - ((msg.position || 0) * 1000);
@@ -302,7 +315,7 @@ wss.on('connection', (ws) => {
         // Host: Pause Cue Trigger (Host Only)
         case 'pause_cue': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             room.playbackState.isPlaying = false;
             room.playbackState.position = msg.position || 0;
 
@@ -319,7 +332,7 @@ wss.on('connection', (ws) => {
         // Host: Seek Cue Trigger (Host Only)
         case 'seek_cue': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             const leadTime = Math.min(msg.leadTime || 250, 300);
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime - (msg.position * 1000);
@@ -346,7 +359,7 @@ wss.on('connection', (ws) => {
         // Host: Periodic Playback Synchronization Broadcast (Master Clock Anchor)
         case 'host_playback_sync': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             const nowMs = getServerMasterTime();
             const hostPosition = typeof msg.position === 'number' ? msg.position : (room.playbackState.position || 0);
             const hostMasterTime = typeof msg.masterTime === 'number' ? msg.masterTime : nowMs;
@@ -383,7 +396,7 @@ wss.on('connection', (ws) => {
         // Host: Change Track (Host Only)
         case 'change_track': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             room.currentTrack = msg.track;
             room.playbackState.position = 0;
             room.playbackState.isPlaying = msg.autoplay || false;
@@ -413,7 +426,7 @@ wss.on('connection', (ws) => {
         // Host: Set Spatial Sound Mode (Host Only)
         case 'set_spatial_mode': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             room.spatialMode = msg.spatialMode; // 'normal', '8d', 'dolby'
             broadcastToRoom(room, {
               type: 'spatial_mode_changed',
@@ -427,7 +440,7 @@ wss.on('connection', (ws) => {
         // Host: Run Channel Speaker Placement Test Sound
         case 'test_channel_cue': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             broadcastToRoom(room, {
               type: 'test_channel_cue',
               targetChannel: msg.targetChannel,
@@ -436,6 +449,7 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
 
         // Client Telemetry
         case 'telemetry_update': {
@@ -456,7 +470,7 @@ wss.on('connection', (ws) => {
         // Host: Assign Channel Remotely
         case 'set_peer_channel': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             for (const [peerWs, peer] of room.peers.entries()) {
               if (peer.id === msg.targetPeerId) {
                 peer.channel = msg.channel;
@@ -495,7 +509,7 @@ wss.on('connection', (ws) => {
         // Host: Kick/Remove a peer device
         case 'kick_peer': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             for (const [peerWs, peer] of room.peers.entries()) {
               if (peer.id === msg.targetPeerId && peerWs !== ws) {
                 try {
@@ -514,7 +528,7 @@ wss.on('connection', (ws) => {
         // Host: Broadcast auto-calibration offset to all peers
         case 'broadcast_calibration': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             broadcastToRoom(room, {
               type: 'apply_calibration',
               offsetMs: msg.offsetMs,
@@ -528,7 +542,7 @@ wss.on('connection', (ws) => {
         // Host: Live Walkie-Talkie DJ Voice Start (Ducks music across all peers)
         case 'dj_voice_start': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             broadcastToRoom(room, {
               type: 'dj_voice_start',
               hostName: msg.hostName || 'Master Host DJ'
@@ -540,7 +554,7 @@ wss.on('connection', (ws) => {
         // Host: Live Walkie-Talkie DJ Voice Audio Chunk
         case 'dj_voice_chunk': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             broadcastToRoom(room, {
               type: 'dj_voice_chunk',
               audioData: msg.audioData
@@ -552,7 +566,7 @@ wss.on('connection', (ws) => {
         // Host: Live Walkie-Talkie DJ Voice Stop (Restores music volume across all peers)
         case 'dj_voice_stop': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             broadcastToRoom(room, {
               type: 'dj_voice_stop'
             }, ws);
@@ -563,7 +577,7 @@ wss.on('connection', (ws) => {
         // Host: Equalizer & Acoustic Preset Broadcast
         case 'set_eq_preset': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             room.eqState = { preset: msg.preset, enabled: msg.enabled };
             broadcastToRoom(room, {
               type: 'eq_preset_changed',
@@ -653,7 +667,7 @@ wss.on('connection', (ws) => {
         case 'queue_remove': {
           const room = rooms.get(currentRoomId);
           if (!room || !room.queue) break;
-          const isHost = room.hostWs === ws;
+          const isHost = isHostSender(room, ws, msg);
           room.queue = room.queue.filter(q => {
             if (q.queueId === msg.queueId) {
               return !(isHost || q.addedByPeerId === peerId);
@@ -671,7 +685,7 @@ wss.on('connection', (ws) => {
         case 'queue_pop_next': {
           const room = rooms.get(currentRoomId);
           if (!room || !room.queue || room.queue.length === 0) break;
-          if (room.hostWs !== ws && !msg.isAutoTransition) break;
+          if (!isHostSender(room, ws, msg) && !msg.isAutoTransition) break;
 
           const nextItem = room.queue.shift();
           room.currentTrack = nextItem.track;
@@ -705,7 +719,7 @@ wss.on('connection', (ws) => {
         // Collaborative Jukebox: Clear Queue (Host Only)
         case 'queue_clear': {
           const room = rooms.get(currentRoomId);
-          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+          if (room && isHostSender(room, ws, msg)) {
             room.queue = [];
             broadcastToRoom(room, {
               type: 'queue_updated',
@@ -718,7 +732,7 @@ wss.on('connection', (ws) => {
         // Host: Auto-DJ Crossfade Setting
         case 'set_crossfade': {
           const room = rooms.get(currentRoomId);
-          if (room && room.hostWs === ws) {
+          if (room && isHostSender(room, ws, msg)) {
             room.crossfadeSec = typeof msg.crossfadeSec === 'number' ? msg.crossfadeSec : 4;
             broadcastToRoom(room, {
               type: 'crossfade_updated',
@@ -727,6 +741,7 @@ wss.on('connection', (ws) => {
           }
           break;
         }
+
       }
     } catch (e) {
       console.error('[SyncPulse WS] Message error:', e);
