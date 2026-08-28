@@ -288,22 +288,70 @@
             <span>Playback is synchronized & controlled by Host</span>
           </div>
 
-          <!-- Spatial Acoustic Engine Mode Selector -->
+          <!-- Spatial Acoustic Engine & 360° Soundfield Radar -->
           <div class="spatial-mode-box">
             <div class="spatial-mode-header">
-              <span>Spatial Acoustic Engine</span>
+              <div class="spatial-mode-title">
+                <span class="pulse-beacon" style="background:var(--neon-cyan); width:6px; height:6px;"></span>
+                <span>🌌 360° SPATIAL ACOUSTIC ENGINE</span>
+              </div>
+              <button id="btn-toggle-radar" class="btn-radar-toggle" title="Toggle 360° Interactive Soundfield Radar">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <circle cx="12" cy="12" r="6"></circle>
+                  <circle cx="12" cy="12" r="2"></circle>
+                  <line x1="12" y1="2" x2="12" y2="22"></line>
+                </svg>
+                <span>360° Radar</span>
+              </button>
             </div>
             <div class="spatial-mode-trio">
-              <button class="mode-btn active" data-mode="normal">Stereo ◀▶</button>
-              <button class="mode-btn" data-mode="8d">8D Audio 🎧</button>
-              <button class="mode-btn" data-mode="dolby">Dolby 5.1 🔊</button>
+              <button class="mode-btn active" data-mode="normal" title="Standard 2-Channel Stereo">Stereo ◀▶</button>
+              <button class="mode-btn" data-mode="8d" title="3D HRTF Auto-Orbiting Binaural Headphone Audio">8D Orbit 🎧</button>
+              <button class="mode-btn" data-mode="360" title="Interactive 360° Spherical Position & Room Reflection">360° Space 🌌</button>
+              <button class="mode-btn" data-mode="dolby" title="Dolby 5.1/7.1 Multi-Channel Surround Matrix">Dolby 5.1 🔊</button>
+              <button class="mode-btn" data-mode="cathedral" title="Cathedral Massive Acoustic Tail Reverb">Cathedral ⛪</button>
+            </div>
+
+            <!-- Interactive 360° Soundfield Radar Visualizer (Collapsible) -->
+            <div id="spatial-radar-box" class="spatial-radar-box" style="display: none;">
+              <div class="radar-container" id="radar-interactive-surface">
+                <div class="radar-crosshair-v"></div>
+                <div class="radar-crosshair-h"></div>
+                <div class="radar-ring ring-3"></div>
+                <div class="radar-ring ring-2"></div>
+                <div class="radar-ring ring-1"></div>
+                <div class="radar-listener-head" title="Listener (Your Head)">👤</div>
+                <div id="radar-sound-node" class="radar-sound-node" title="360° Audio Source (Click/Drag to Reposition)">
+                  <span class="radar-sound-dot"></span>
+                  <span class="radar-sound-pulse"></span>
+                  <span class="radar-sound-label">360° Audio</span>
+                </div>
+              </div>
+              <div class="radar-telemetry">
+                <div class="radar-stat">
+                  <span class="stat-lbl">AZIMUTH:</span>
+                  <span id="radar-azimuth-val" class="stat-val">0° (Front)</span>
+                </div>
+                <div class="radar-stat">
+                  <span class="stat-lbl">ELEVATION:</span>
+                  <span id="radar-elevation-val" class="stat-val">0°</span>
+                </div>
+                <div class="radar-stat">
+                  <span class="stat-lbl">DISTANCE:</span>
+                  <span id="radar-distance-val" class="stat-val">3.0m</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- 5-Band Equalizer & Acoustic FX Presets Rack -->
+          <!-- 10-Band Graphic Equalizer & Acoustic FX Presets Rack -->
           <div class="eq-rack-box">
             <div class="eq-rack-header">
-              <span class="eq-rack-title">🎛️ Equalizer & Acoustic FX</span>
+              <div class="eq-header-left">
+                <span class="eq-rack-title">🎛️ 10-Band Equalizer & FX</span>
+                <button id="btn-toggle-eq-sliders" class="btn-eq-sliders-toggle" title="Show / Hide 10-Band Precision Sliders">🎚️ 10-Band Sliders</button>
+              </div>
               <label class="eq-toggle-label" title="Toggle Equalizer DSP On / Off">
                 <input type="checkbox" id="toggle-eq" checked>
                 <span class="eq-toggle-text">EQ ON</span>
@@ -311,12 +359,71 @@
             </div>
             <div class="eq-presets-row">
               <button class="eq-preset-btn active" data-preset="bass_booster" title="Sub-Bass & Kick Boost (+9dB)">🔊 Bass Boost</button>
-              <button class="eq-preset-btn" data-preset="vocal_enhancer" title="Vocal Clarity & Presence (+6dB)">🎤 Vocal</button>
-              <button class="eq-preset-btn" data-preset="concert_hall" title="Lush Spatial Convolution Reverb">🏛️ Concert Hall</button>
+              <button class="eq-preset-btn" data-preset="vocal_enhancer" title="Vocal Clarity & Presence (+8dB)">🎤 Vocal</button>
               <button class="eq-preset-btn" data-preset="edm" title="V-Shaped Bass & Crisp Highs">⚡ EDM</button>
+              <button class="eq-preset-btn" data-preset="concert_hall" title="Lush Spatial Convolution Reverb">🏛️ Hall</button>
+              <button class="eq-preset-btn" data-preset="rock" title="Rock / Metal Punch & Attack">🎸 Rock</button>
+              <button class="eq-preset-btn" data-preset="lofi" title="Warm Analog Lo-Fi Tape">🧘 Lo-Fi</button>
               <button class="eq-preset-btn" data-preset="flat" title="Flat Studio Reference (Neutral)">🎚️ Flat</button>
             </div>
+
+            <!-- 10-Band Precision Sliders Drawer (Collapsible) -->
+            <div id="eq-sliders-drawer" class="eq-sliders-drawer" style="display: none;">
+              <div class="eq-bands-cluster">
+                <div class="eq-band-col" data-band="0">
+                  <span class="eq-band-val" id="eq-val-0">+9dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="9" data-band="0" orient="vertical">
+                  <span class="eq-band-lbl">31Hz</span>
+                </div>
+                <div class="eq-band-col" data-band="1">
+                  <span class="eq-band-val" id="eq-val-1">+8dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="8" data-band="1" orient="vertical">
+                  <span class="eq-band-lbl">63Hz</span>
+                </div>
+                <div class="eq-band-col" data-band="2">
+                  <span class="eq-band-val" id="eq-val-2">+5dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="5" data-band="2" orient="vertical">
+                  <span class="eq-band-lbl">125Hz</span>
+                </div>
+                <div class="eq-band-col" data-band="3">
+                  <span class="eq-band-val" id="eq-val-3">+2dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="2" data-band="3" orient="vertical">
+                  <span class="eq-band-lbl">250Hz</span>
+                </div>
+                <div class="eq-band-col" data-band="4">
+                  <span class="eq-band-val" id="eq-val-4">0dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="0" data-band="4" orient="vertical">
+                  <span class="eq-band-lbl">500Hz</span>
+                </div>
+                <div class="eq-band-col" data-band="5">
+                  <span class="eq-band-val" id="eq-val-5">0dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="0" data-band="5" orient="vertical">
+                  <span class="eq-band-lbl">1kHz</span>
+                </div>
+                <div class="eq-band-col" data-band="6">
+                  <span class="eq-band-val" id="eq-val-6">+1dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="1" data-band="6" orient="vertical">
+                  <span class="eq-band-lbl">2kHz</span>
+                </div>
+                <div class="eq-band-col" data-band="7">
+                  <span class="eq-band-val" id="eq-val-7">+2dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="2" data-band="7" orient="vertical">
+                  <span class="eq-band-lbl">4kHz</span>
+                </div>
+                <div class="eq-band-col" data-band="8">
+                  <span class="eq-band-val" id="eq-val-8">+3dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="3" data-band="8" orient="vertical">
+                  <span class="eq-band-lbl">8kHz</span>
+                </div>
+                <div class="eq-band-col" data-band="9">
+                  <span class="eq-band-val" id="eq-val-9">+4dB</span>
+                  <input type="range" class="eq-band-slider" min="-12" max="12" step="0.5" value="4" data-band="9" orient="vertical">
+                  <span class="eq-band-lbl">16kHz</span>
+                </div>
+              </div>
+            </div>
           </div>
+
 
           <!-- Stereo VU Decibel Meters -->
           <div class="vu-cluster">

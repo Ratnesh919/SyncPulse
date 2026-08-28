@@ -54,17 +54,22 @@ class AudioEngine {
       this.hardwareLatencyOffsetMs = parseFloat(savedDelay) || 0;
     }
 
-    // 5-Band Equalizer & Acoustic Presets
+    // 10-Band Graphic Equalizer & Acoustic Presets (31Hz to 16kHz)
     this.eqEnabled = true;
     this.currentEqPreset = 'bass_booster';
-    this.eqSubBass = null;
-    this.eqLowMid = null;
-    this.eqMid = null;
-    this.eqHighMid = null;
-    this.eqTreble = null;
+    this.eqFrequencies = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    this.eqBands = [];
+    this.eqGains = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     this.convolver = null;
     this.reverbGain = null;
     this.dryGain = null;
+    this.masterCompressor = null;
+
+    // 360° Real Space Spatial Coordinates
+    this.spatial360Azimuth = 0;   // 0 to 360 deg
+    this.spatial360Elevation = 0; // -90 to +90 deg
+    this.spatial360Distance = 3.0; // 1 to 10 meters
+    this.on360PositionUpdateCallback = null;
 
     // DJ Voice Ducking & Direct Stream
     this.duckingGainNode = null;
@@ -105,58 +110,55 @@ class AudioEngine {
     this.duckingGainNode = this.ctx.createGain();
     this.duckingGainNode.gain.value = 1.0;
 
-    // 5-Band Graphic Equalizer Filter Nodes
-    this.eqSubBass = this.ctx.createBiquadFilter();
-    this.eqSubBass.type = 'lowshelf';
-    this.eqSubBass.frequency.value = 65;
-    this.eqSubBass.gain.value = 0;
+    // Mastering Dynamics Compressor / Brickwall Limiter (Prevents Digital Clipping)
+    this.masterCompressor = this.ctx.createDynamicsCompressor();
+    this.masterCompressor.threshold.value = -12;
+    this.masterCompressor.knee.value = 10;
+    this.masterCompressor.ratio.value = 4.0;
+    this.masterCompressor.attack.value = 0.003;
+    this.masterCompressor.release.value = 0.25;
 
-    this.eqLowMid = this.ctx.createBiquadFilter();
-    this.eqLowMid.type = 'peaking';
-    this.eqLowMid.frequency.value = 250;
-    this.eqLowMid.Q.value = 1.0;
-    this.eqLowMid.gain.value = 0;
+    // 10-Band Graphic Equalizer Filter Chain (31Hz, 63Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz)
+    this.eqBands = [];
+    for (let i = 0; i < this.eqFrequencies.length; i++) {
+      const freq = this.eqFrequencies[i];
+      const filter = this.ctx.createBiquadFilter();
+      if (i === 0) {
+        filter.type = 'lowshelf';
+      } else if (i === this.eqFrequencies.length - 1) {
+        filter.type = 'highshelf';
+      } else {
+        filter.type = 'peaking';
+        filter.Q.value = 1.414; // ISO standard 1-octave bandwidth
+      }
+      filter.frequency.value = freq;
+      filter.gain.value = 0;
+      this.eqBands.push(filter);
+    }
 
-    this.eqMid = this.ctx.createBiquadFilter();
-    this.eqMid.type = 'peaking';
-    this.eqMid.frequency.value = 1200;
-    this.eqMid.Q.value = 1.0;
-    this.eqMid.gain.value = 0;
+    // Connect 10-band serial cascade: ducking -> Band 0 -> Band 1 -> ... -> Band 9
+    this.duckingGainNode.connect(this.eqBands[0]);
+    for (let i = 0; i < this.eqBands.length - 1; i++) {
+      this.eqBands[i].connect(this.eqBands[i + 1]);
+    }
 
-    this.eqHighMid = this.ctx.createBiquadFilter();
-    this.eqHighMid.type = 'peaking';
-    this.eqHighMid.frequency.value = 3500;
-    this.eqHighMid.Q.value = 1.0;
-    this.eqHighMid.gain.value = 0;
-
-    this.eqTreble = this.ctx.createBiquadFilter();
-    this.eqTreble.type = 'highshelf';
-    this.eqTreble.frequency.value = 11000;
-    this.eqTreble.gain.value = 0;
-
-    // Concert Hall Reverb Architecture (Synthesized Lush Impulse Response)
+    // Concert Hall / Cathedral Multi-Room Reverb Architecture
     this.convolver = this.ctx.createConvolver();
-    this.convolver.buffer = this.createConcertHallImpulse(2.2, 2.0);
+    this.convolver.buffer = this.createConcertHallImpulse(2.6, 2.0);
     this.reverbGain = this.ctx.createGain();
     this.reverbGain.gain.value = 0.0;
     this.dryGain = this.ctx.createGain();
     this.dryGain.gain.value = 1.0;
 
-    // Wire EQ Chain:
-    // duckingGainNode -> eqSubBass -> eqLowMid -> eqMid -> eqHighMid -> eqTreble
-    this.duckingGainNode.connect(this.eqSubBass);
-    this.eqSubBass.connect(this.eqLowMid);
-    this.eqLowMid.connect(this.eqMid);
-    this.eqMid.connect(this.eqHighMid);
-    this.eqHighMid.connect(this.eqTreble);
+    const lastEqBand = this.eqBands[this.eqBands.length - 1];
+    lastEqBand.connect(this.dryGain);
+    this.dryGain.connect(this.masterCompressor);
 
-    // eqTreble splits into Dry path and Convolver Reverb path -> gainNode
-    this.eqTreble.connect(this.dryGain);
-    this.dryGain.connect(this.gainNode);
-
-    this.eqTreble.connect(this.convolver);
+    lastEqBand.connect(this.convolver);
     this.convolver.connect(this.reverbGain);
-    this.reverbGain.connect(this.gainNode);
+    this.reverbGain.connect(this.masterCompressor);
+
+    this.masterCompressor.connect(this.gainNode);
 
     // Apply default EQ preset
     this.setEqPreset(this.currentEqPreset);
@@ -172,14 +174,14 @@ class AudioEngine {
     this.analyser.smoothingTimeConstant = 0.8;
     this.timeDomainBuffer = new Uint8Array(this.analyser.fftSize);
 
-    // 1. Setup 3D HRTF Binaural Panner for Real 8D Sound
+    // 1. Setup 3D HRTF Binaural Panner for Real 360° & 8D Spatial Audio
     try {
       this.panner3D = this.ctx.createPanner();
       this.panner3D.panningModel = 'HRTF';
-      this.panner3D.distanceModel = 'exponential';
+      this.panner3D.distanceModel = 'inverse';
       this.panner3D.refDistance = 1;
       this.panner3D.maxDistance = 10000;
-      this.panner3D.rolloffFactor = 1.2;
+      this.panner3D.rolloffFactor = 1.0;
       this.panner3D.coneInnerAngle = 360;
 
       // Position Listener at origin facing positive Z
@@ -251,6 +253,7 @@ class AudioEngine {
   }
 
 
+
   autoCalibrateHardwareDelay() {
     if (!this.ctx) return 0;
     const baseLatency = (this.ctx.baseLatency || 0) * 1000;
@@ -263,8 +266,70 @@ class AudioEngine {
   }
 
   setSpatialMode(mode) {
-    this.spatialMode = mode; // 'normal', '8d', 'dolby'
+    this.spatialMode = mode; // 'normal', '8d', '360', 'dolby', 'cathedral'
+    if (mode === 'cathedral') {
+      if (this.convolver) this.convolver.buffer = this.createCathedralImpulse(4.5, 1.8);
+      if (this.reverbGain && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.reverbGain.gain.cancelScheduledValues(now);
+        this.reverbGain.gain.setTargetAtTime(0.55, now, 0.05);
+      }
+    } else if (mode === '8d' || mode === '360') {
+      if (this.reverbGain && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.reverbGain.gain.cancelScheduledValues(now);
+        this.reverbGain.gain.setTargetAtTime(0.12, now, 0.05);
+      }
+    }
     this.applyAudioRouting();
+  }
+
+  set360Position(azimuthDeg, elevationDeg = 0, distanceM = 3.0) {
+    this.spatial360Azimuth = ((azimuthDeg % 360) + 360) % 360;
+    this.spatial360Elevation = Math.max(-85, Math.min(85, elevationDeg));
+    this.spatial360Distance = Math.max(1, Math.min(10, distanceM));
+
+    if (!this.ctx || !this.panner3D) return;
+
+    const azRad = (this.spatial360Azimuth * Math.PI) / 180;
+    const elRad = (this.spatial360Elevation * Math.PI) / 180;
+
+    // 3D Spherical to Cartesian Coordinates:
+    // +X = Right, -X = Left
+    // +Y = Above, -Y = Below
+    // +Z = Front, -Z = Behind
+    const x = this.spatial360Distance * Math.cos(elRad) * Math.sin(azRad);
+    const y = this.spatial360Distance * Math.sin(elRad);
+    const z = this.spatial360Distance * Math.cos(elRad) * Math.cos(azRad);
+
+    const now = this.ctx.currentTime;
+    if (this.panner3D.positionX) {
+      this.panner3D.positionX.setTargetAtTime(x, now, 0.04);
+      this.panner3D.positionY.setTargetAtTime(y, now, 0.04);
+      this.panner3D.positionZ.setTargetAtTime(z, now, 0.04);
+    } else {
+      this.panner3D.setPosition(x, y, z);
+    }
+
+    // Dynamic Head-Shadow Pinna Occlusion (attenuates treble when audio is behind head)
+    if (this.headShadowFilter) {
+      const isBehind = z < 0;
+      const targetCutoff = isBehind ? (3200 + (1 + z / this.spatial360Distance) * 4800) : 20000;
+      this.headShadowFilter.frequency.setTargetAtTime(targetCutoff, now, 0.06);
+    }
+
+    if (this.on360PositionUpdateCallback) {
+      this.on360PositionUpdateCallback({
+        azimuth: this.spatial360Azimuth,
+        elevation: this.spatial360Elevation,
+        distance: this.spatial360Distance,
+        x, y, z
+      });
+    }
+  }
+
+  on360PositionUpdate(cb) {
+    this.on360PositionUpdateCallback = cb;
   }
 
   setChannelMode(channel) {
@@ -292,8 +357,8 @@ class AudioEngine {
     safeDisconnect(this.analyser);
 
     try {
-      // Mode 1: Real 3D HRTF 8D Revolving Binaural
-      if (this.spatialMode === '8d' && this.panner3D) {
+      // Mode 1: 3D HRTF 8D & 360° Real Space Binaural Panning
+      if ((this.spatialMode === '8d' || this.spatialMode === '360' || this.spatialMode === 'cathedral') && this.panner3D) {
         this.gainNode.connect(this.headShadowFilter);
         this.headShadowFilter.connect(this.panner3D);
         this.panner3D.connect(this.analyser);
@@ -334,18 +399,12 @@ class AudioEngine {
         this.merger.connect(this.analyser);
       } else {
         // Default: Full Stereo (normal or dolby-all)
-        if (this.spatialMode === 'dolby') {
-          // Dolby 5.1 full stereo: add subtle widening via slight delay on right channel
-          this.gainNode.connect(this.analyser);
-        } else {
-          this.gainNode.connect(this.analyser);
-        }
+        this.gainNode.connect(this.analyser);
       }
 
       // Always connect analyser → destination
       this.analyser.connect(this.ctx.destination);
     } catch (e) {
-      // Fallback: direct path always works
       try {
         this.gainNode.connect(this.ctx.destination);
       } catch (e2) {}
@@ -355,33 +414,19 @@ class AudioEngine {
 
   start8DOrbitLoop() {
     const updateOrbit = () => {
-      if (this.spatialMode === '8d' && this.panner3D && this.ctx) {
-        this.orbitAngle += this.orbitSpeed;
-        
-        // 3D Elliptical Orbit around head
-        const radius = 3.5;
-        const x = Math.sin(this.orbitAngle) * radius;
-        const z = Math.cos(this.orbitAngle) * radius; // +Z is front, -Z is behind head
-        const y = Math.sin(this.orbitAngle * 2) * 0.7; // slight vertical tilt
-
-        if (this.panner3D.positionX) {
-          this.panner3D.positionX.setValueAtTime(x, this.ctx.currentTime);
-          this.panner3D.positionY.setValueAtTime(y, this.ctx.currentTime);
-          this.panner3D.positionZ.setValueAtTime(z, this.ctx.currentTime);
-        } else {
-          this.panner3D.setPosition(x, y, z);
-        }
-
-        // Dynamic Head-Shadow Pinna Occlusion: when behind head (z < 0), cut highs for true 360 realism
-        if (this.headShadowFilter) {
-          const targetCutoff = z < 0 ? (3500 + (1 + z / radius) * 4500) : 20000;
-          this.headShadowFilter.frequency.setTargetAtTime(targetCutoff, this.ctx.currentTime, 0.08);
+      if ((this.spatialMode === '8d' || this.spatialMode === '360') && this.panner3D && this.ctx) {
+        if (this.spatialMode === '8d') {
+          this.orbitAngle += this.orbitSpeed;
+          const azDeg = (this.orbitAngle * 180 / Math.PI) % 360;
+          const elDeg = Math.sin(this.orbitAngle * 1.5) * 15;
+          this.set360Position(azDeg, elDeg, 3.2);
         }
       }
       this.pannerAnimId = requestAnimationFrame(updateOrbit);
     };
     updateOrbit();
   }
+
 
   setSyncEngine(syncEngine) {
     this.syncEngineRef = syncEngine;
@@ -646,31 +691,61 @@ class AudioEngine {
     return impulse;
   }
 
-  applyEqGains(sub, lowMid, mid, highMid, treble, reverbWet = 0) {
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const ramp = (node, val) => {
-      if (node && node.gain) {
-        node.gain.cancelScheduledValues(now);
-        node.gain.setTargetAtTime(val, now, 0.05);
-      }
-    };
-    ramp(this.eqSubBass, sub);
-    ramp(this.eqLowMid, lowMid);
-    ramp(this.eqMid, mid);
-    ramp(this.eqHighMid, highMid);
-    ramp(this.eqTreble, treble);
+  // Generate Cathedral Reverb impulse with long decay
+  createCathedralImpulse(duration = 4.5, decay = 1.8) {
+    if (!this.ctx) return null;
+    const rate = this.ctx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
 
+    for (let i = 0; i < length; i++) {
+      const n = i / length;
+      const env = Math.pow(1 - n, decay);
+      left[i] = (Math.random() * 2 - 1) * env;
+      right[i] = (Math.random() * 2 - 1) * env;
+    }
+    return impulse;
+  }
+
+  setBandGain(index, dbGain) {
+    if (!this.ctx || index < 0 || index >= this.eqBands.length) return;
+    const clamped = Math.max(-12, Math.min(12, dbGain));
+    this.eqGains[index] = clamped;
+    if (this.eqEnabled && this.eqBands[index]) {
+      const now = this.ctx.currentTime;
+      this.eqBands[index].gain.cancelScheduledValues(now);
+      this.eqBands[index].gain.setTargetAtTime(clamped, now, 0.04);
+    }
+  }
+
+  getBandGains() {
+    return [...this.eqGains];
+  }
+
+  apply10BandGains(gainsArray, reverbWet = 0) {
+    if (!this.ctx || !this.eqBands.length) return;
+    const now = this.ctx.currentTime;
+    for (let i = 0; i < this.eqBands.length; i++) {
+      const val = (this.eqEnabled && gainsArray && typeof gainsArray[i] === 'number') ? gainsArray[i] : 0;
+      this.eqGains[i] = val;
+      const filter = this.eqBands[i];
+      if (filter && filter.gain) {
+        filter.gain.cancelScheduledValues(now);
+        filter.gain.setTargetAtTime(val, now, 0.04);
+      }
+    }
     if (this.reverbGain) {
       this.reverbGain.gain.cancelScheduledValues(now);
-      this.reverbGain.gain.setTargetAtTime(reverbWet, now, 0.05);
+      this.reverbGain.gain.setTargetAtTime(this.eqEnabled ? reverbWet : 0, now, 0.04);
     }
   }
 
   setEqEnabled(enabled) {
     this.eqEnabled = !!enabled;
     if (!this.eqEnabled) {
-      this.applyEqGains(0, 0, 0, 0, 0, 0);
+      this.apply10BandGains([0,0,0,0,0,0,0,0,0,0], 0);
     } else {
       this.setEqPreset(this.currentEqPreset || 'bass_booster');
     }
@@ -679,28 +754,35 @@ class AudioEngine {
   setEqPreset(presetName) {
     this.currentEqPreset = presetName;
     if (!this.eqEnabled) {
-      this.applyEqGains(0, 0, 0, 0, 0, 0);
+      this.apply10BandGains([0,0,0,0,0,0,0,0,0,0], 0);
       return;
     }
     switch (presetName) {
       case 'bass_booster':
-        this.applyEqGains(9.0, 4.0, 0.0, 0.0, 1.5, 0.0);
+        this.apply10BandGains([9.0, 8.0, 5.0, 2.0, 0.0, 0.0, 1.0, 2.0, 3.0, 4.0], 0.0);
         break;
       case 'vocal_enhancer':
-        this.applyEqGains(-3.5, 0.0, 6.0, 5.0, 2.5, 0.06);
+        this.apply10BandGains([-4.0, -2.0, 0.0, 3.0, 6.0, 8.0, 6.0, 4.0, 2.0, 0.0], 0.08);
         break;
       case 'concert_hall':
-        this.applyEqGains(2.0, 2.0, 1.0, 3.0, 4.5, 0.42);
+        this.apply10BandGains([3.0, 2.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], 0.45);
         break;
       case 'edm':
-        this.applyEqGains(8.5, -2.0, 1.0, 4.0, 7.0, 0.10);
+        this.apply10BandGains([8.0, 7.0, 4.0, 0.0, -2.0, 1.0, 4.0, 6.0, 8.0, 9.0], 0.12);
+        break;
+      case 'rock':
+        this.apply10BandGains([6.0, 5.0, 3.0, -1.0, -3.0, -1.0, 3.0, 6.0, 7.0, 8.0], 0.06);
+        break;
+      case 'lofi':
+        this.apply10BandGains([5.0, 4.0, 3.0, 2.0, 0.0, -2.0, -5.0, -8.0, -12.0, -15.0], 0.15);
         break;
       case 'flat':
       default:
-        this.applyEqGains(0, 0, 0, 0, 0, 0);
+        this.apply10BandGains([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0.0);
         break;
     }
   }
+
 
   // Smoothly duck background music during Host DJ voiceover
   duckMusic(shouldDuck) {
@@ -822,7 +904,7 @@ class AudioEngine {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(800, now);
         osc.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
-      } else if (presetOrMode === 'concert_hall' || presetOrMode === '8d') {
+      } else if (presetOrMode === 'concert_hall' || presetOrMode === '8d' || presetOrMode === '360') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(520, now);
         osc.frequency.exponentialRampToValueAtTime(780, now + 0.22);
@@ -830,6 +912,18 @@ class AudioEngine {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(110, now);
         osc.frequency.exponentialRampToValueAtTime(220, now + 0.15);
+      } else if (presetOrMode === 'rock') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(440, now + 0.18);
+      } else if (presetOrMode === 'lofi') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(160, now + 0.22);
+      } else if (presetOrMode === 'cathedral') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(380, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 0.35);
       } else {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(440, now);

@@ -588,6 +588,32 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        // Host: Equalizer Individual Band Adjustment
+        case 'set_eq_band': {
+          const room = rooms.get(currentRoomId);
+          if (room && isHostSender(room, ws, msg)) {
+            broadcastToRoom(room, {
+              type: 'eq_band_changed',
+              band: msg.band,
+              gain: msg.gain
+            }, ws);
+          }
+          break;
+        }
+
+        // Host: Spatial Audio Mode Broadcast
+        case 'set_spatial_mode': {
+          const room = rooms.get(currentRoomId);
+          if (room && isHostSender(room, ws, msg)) {
+            room.spatialMode = msg.mode;
+            broadcastToRoom(room, {
+              type: 'spatial_mode_changed',
+              mode: msg.mode
+            });
+          }
+          break;
+        }
+
         // Collaborative Democratic Jukebox: Add Song to Queue
         case 'queue_add': {
           const room = rooms.get(currentRoomId);

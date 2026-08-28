@@ -123,6 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggleEq = document.getElementById('toggle-eq');
   const eqPresetButtons = document.querySelectorAll('.eq-preset-btn');
   const eqRackBox = document.querySelector('.eq-rack-box');
+  const btnToggleEqSliders = document.getElementById('btn-toggle-eq-sliders');
+  const eqSlidersDrawer = document.getElementById('eq-sliders-drawer');
+  const eqBandSliders = document.querySelectorAll('.eq-band-slider');
+
+  // 360° Spatial Radar Elements
+  const btnToggleRadar = document.getElementById('btn-toggle-radar');
+  const spatialRadarBox = document.getElementById('spatial-radar-box');
+  const radarInteractiveSurface = document.getElementById('radar-interactive-surface');
+  const radarSoundNode = document.getElementById('radar-sound-node');
+  const radarAzimuthVal = document.getElementById('radar-azimuth-val');
+  const radarElevationVal = document.getElementById('radar-elevation-val');
+  const radarDistanceVal = document.getElementById('radar-distance-val');
 
   // Continuous Auto-Sync Elements
   const autoSyncStatusBadge = document.getElementById('auto-sync-status-badge');
@@ -1008,6 +1020,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         audioEngine.setEqEnabled(msg.enabled);
         if (msg.preset) audioEngine.setEqPreset(msg.preset);
+        syncSlidersWithEngine();
+        break;
+
+      case 'eq_band_changed':
+        if (typeof msg.band === 'number' && typeof msg.gain === 'number') {
+          audioEngine.setBandGain(msg.band, msg.gain);
+          const slider = document.querySelector(`.eq-band-slider[data-band="${msg.band}"]`);
+          if (slider) slider.value = msg.gain;
+          const valSpan = document.getElementById(`eq-val-${msg.band}`);
+          if (valSpan) {
+            valSpan.textContent = (msg.gain > 0 ? `+${msg.gain}` : `${msg.gain}`) + 'dB';
+          }
+          eqPresetButtons.forEach(b => b.classList.remove('active'));
+        }
+        break;
+
+      case 'spatial_mode_changed':
+        if (msg.mode) {
+          setSpatialModeUi(msg.mode, true);
+        }
         break;
 
       case 'queue_updated':
@@ -1515,7 +1547,50 @@ document.addEventListener('DOMContentLoaded', () => {
     btnDjMic.addEventListener('touchend', (e) => { stopDjTalking(e); }, { passive: false });
   }
 
+  function syncSlidersWithEngine() {
+    const gains = audioEngine.getBandGains();
+    eqBandSliders.forEach((slider, idx) => {
+      if (typeof gains[idx] === 'number') {
+        slider.value = gains[idx];
+        const valSpan = document.getElementById(`eq-val-${idx}`);
+        if (valSpan) {
+          valSpan.textContent = (gains[idx] > 0 ? `+${gains[idx]}` : `${gains[idx]}`) + 'dB';
+        }
+      }
+    });
+  }
+
   function setupEqualizerControls() {
+    if (btnToggleEqSliders && eqSlidersDrawer) {
+      btnToggleEqSliders.addEventListener('click', () => {
+        const isHidden = eqSlidersDrawer.style.display === 'none';
+        eqSlidersDrawer.style.display = isHidden ? 'block' : 'none';
+        btnToggleEqSliders.classList.toggle('active', isHidden);
+        if (isHidden) syncSlidersWithEngine();
+      });
+    }
+
+    eqBandSliders.forEach(slider => {
+      slider.addEventListener('input', async () => {
+        await audioEngine.init();
+        const band = parseInt(slider.dataset.band, 10);
+        const val = parseFloat(slider.value);
+        const valSpan = document.getElementById(`eq-val-${band}`);
+        if (valSpan) {
+          valSpan.textContent = (val > 0 ? `+${val}` : `${val}`) + 'dB';
+        }
+        audioEngine.setBandGain(band, val);
+        eqPresetButtons.forEach(b => b.classList.remove('active'));
+        if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'set_eq_band',
+            band: band,
+            gain: val
+          }));
+        }
+      });
+    });
+
     if (toggleEq) {
       toggleEq.addEventListener('change', async () => {
         await audioEngine.init();
@@ -1525,6 +1600,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (enabled) eqRackBox.classList.remove('disabled');
           else eqRackBox.classList.add('disabled');
         }
+        syncSlidersWithEngine();
         showToast(enabled ? '🎛️ Equalizer DSP: ENABLED' : '🎛️ Equalizer DSP: BYPASSED (OFF)');
         if (enabled) {
           audioEngine.playPresetPreviewCue(audioEngine.currentEqPreset || 'bass_booster');
@@ -1546,6 +1622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         eqPresetButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         audioEngine.setEqPreset(preset);
+        syncSlidersWithEngine();
         audioEngine.playPresetPreviewCue(preset);
         showToast(`🎛️ Preset Applied: ${btn.textContent.trim()}`);
         if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
@@ -1557,10 +1634,86 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+
+    // 360 Spatial Radar Setup
+    if (btnToggleRadar && spatialRadarBox) {
+      btnToggleRadar.addEventListener('click', () => {
+        const isHidden = spatialRadarBox.style.display === 'none';
+        spatialRadarBox.style.display = isHidden ? 'flex' : 'none';
+        btnToggleRadar.classList.toggle('active', isHidden);
+      });
+    }
+
+    if (radarInteractiveSurface && radarSoundNode) {
+      let isDraggingRadar = false;
+
+      function handleRadarPointer(e) {
+        const rect = radarInteractiveSurface.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const dx = clientX - cx;
+        const dy = clientY - cy;
+        const maxRadius = Math.max(20, rect.width / 2 - 12);
+        const distPx = Math.min(maxRadius, Math.hypot(dx, dy));
+        const angleRad = Math.atan2(dx, -dy);
+        const azDeg = Math.round(((angleRad * 180 / Math.PI) + 360) % 360);
+        const distanceM = Math.max(1.0, Math.min(10.0, (distPx / maxRadius) * 6.0));
+
+        if (currentSpatialMode !== '360') {
+          setSpatialModeUi('360', true);
+        }
+
+        audioEngine.set360Position(azDeg, 0, distanceM);
+      }
+
+      radarInteractiveSurface.addEventListener('mousedown', (e) => {
+        isDraggingRadar = true;
+        handleRadarPointer(e);
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (isDraggingRadar) handleRadarPointer(e);
+      });
+      window.addEventListener('mouseup', () => { isDraggingRadar = false; });
+
+      radarInteractiveSurface.addEventListener('touchstart', (e) => {
+        isDraggingRadar = true;
+        handleRadarPointer(e);
+      }, { passive: true });
+      window.addEventListener('touchmove', (e) => {
+        if (isDraggingRadar) handleRadarPointer(e);
+      }, { passive: true });
+      window.addEventListener('touchend', () => { isDraggingRadar = false; });
+    }
+
+    audioEngine.on360PositionUpdate((pos) => {
+      if (!radarSoundNode || !radarInteractiveSurface) return;
+      const rect = radarInteractiveSurface.getBoundingClientRect();
+      const maxRadius = Math.max(20, (rect.width > 0 ? rect.width / 2 : 70) - 12);
+      const rad = (pos.azimuth * Math.PI) / 180;
+      const normDist = Math.min(1.0, pos.distance / 6.0);
+      const rPx = normDist * maxRadius;
+
+      const px = Math.sin(rad) * rPx;
+      const py = -Math.cos(rad) * rPx;
+
+      radarSoundNode.style.transform = `translate(calc(-50% + ${px.toFixed(1)}px), calc(-50% + ${py.toFixed(1)}px))`;
+
+      if (radarAzimuthVal) {
+        let dir = 'Front';
+        if (pos.azimuth > 45 && pos.azimuth < 135) dir = 'Right';
+        else if (pos.azimuth >= 135 && pos.azimuth <= 225) dir = 'Rear';
+        else if (pos.azimuth > 225 && pos.azimuth < 315) dir = 'Left';
+        radarAzimuthVal.textContent = `${Math.round(pos.azimuth)}° (${dir})`;
+      }
+      if (radarElevationVal) radarElevationVal.textContent = `${Math.round(pos.elevation)}°`;
+      if (radarDistanceVal) radarDistanceVal.textContent = `${pos.distance.toFixed(1)}m`;
+    });
   }
 
-
-  async function setSpatialModeUi(mode) {
+  async function setSpatialModeUi(mode, skipWs = false) {
     currentSpatialMode = mode;
     await audioEngine.init();
     audioEngine.setSpatialMode(mode);
@@ -1572,6 +1725,18 @@ document.addEventListener('DOMContentLoaded', () => {
         b.classList.remove('active');
       }
     });
+
+    if (mode === '360' || mode === '8d') {
+      if (spatialRadarBox) spatialRadarBox.style.display = 'flex';
+      if (btnToggleRadar) btnToggleRadar.classList.add('active');
+    }
+
+    if (!skipWs && myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'set_spatial_mode',
+        mode: mode
+      }));
+    }
   }
 
   function setupYouTubeDesk() {

@@ -813,7 +813,7 @@ body {
   gap: 4px;
 }
 
-/* Spatial Sound Mode Toggles */
+/* Spatial Sound Mode Toggles & 360° Radar */
 .spatial-mode-box {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-medium);
@@ -835,15 +835,43 @@ body {
   letter-spacing: 0.5px;
 }
 
+.spatial-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.btn-radar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  border-radius: 20px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-radar-toggle:hover, .btn-radar-toggle.active {
+  background: rgba(0, 242, 254, 0.2);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
 .spatial-mode-trio {
   display: grid;
-  grid-template-columns: 1fr 1.05fr 1.15fr;
-  gap: 5px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
 }
 
 .mode-btn {
-  padding: 5px 6px;
-  font-size: 0.72rem;
+  padding: 5px 4px;
+  font-size: 0.68rem;
   font-weight: 600;
   border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.04);
@@ -852,6 +880,7 @@ body {
   cursor: pointer;
   transition: all var(--transition-fast);
   text-align: center;
+  white-space: nowrap;
 }
 
 .mode-btn:hover {
@@ -866,7 +895,123 @@ body {
   box-shadow: 0 0 14px var(--neon-magenta-glow);
 }
 
-/* 5-Band Equalizer & Reverb Presets Rack */
+/* Interactive 360° Soundfield Radar Visualizer */
+.spatial-radar-box {
+  margin-top: 4px;
+  padding: 8px;
+  background: radial-gradient(circle at center, rgba(0, 242, 254, 0.06) 0%, rgba(5, 10, 22, 0.85) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.radar-container {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  box-shadow: inset 0 0 20px rgba(0, 242, 254, 0.15), 0 0 12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+.radar-crosshair-v {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 1px;
+  background: rgba(0, 242, 254, 0.25);
+}
+
+.radar-crosshair-h {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: rgba(0, 242, 254, 0.25);
+}
+
+.radar-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 242, 254, 0.22);
+  pointer-events: none;
+}
+
+.ring-1 { width: 40px; height: 40px; }
+.ring-2 { width: 80px; height: 80px; }
+.ring-3 { width: 120px; height: 120px; }
+
+.radar-listener-head {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.15rem;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.radar-sound-node {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 5;
+  transition: transform 0.05s linear;
+}
+
+.radar-sound-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff0055;
+  box-shadow: 0 0 10px #ff0055, 0 0 20px #ff007f;
+}
+
+.radar-sound-pulse {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 0, 127, 0.6);
+  animation: radar-beacon 1.4s infinite linear;
+}
+
+.radar-sound-label {
+  display: none;
+}
+
+@keyframes radar-beacon {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.radar-telemetry {
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.radar-stat .stat-lbl { color: var(--text-tertiary); margin-right: 3px; }
+.radar-stat .stat-val { color: var(--neon-cyan); font-weight: 700; }
+
+/* 10-Band Equalizer & Reverb Presets Rack */
 .eq-rack-box {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-medium);
@@ -883,12 +1028,36 @@ body {
   align-items: center;
 }
 
+.eq-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .eq-rack-title {
   font-size: 0.65rem;
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.btn-eq-sliders-toggle {
+  padding: 2px 7px;
+  font-size: 0.60rem;
+  font-weight: 700;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-eq-sliders-toggle:hover, .btn-eq-sliders-toggle.active {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
 }
 
 .eq-toggle-label {
@@ -912,13 +1081,13 @@ body {
 
 .eq-presets-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 4px;
 }
 
 .eq-preset-btn {
-  padding: 4px 5px;
-  font-size: 0.68rem;
+  padding: 4px 3px;
+  font-size: 0.65rem;
   font-weight: 600;
   border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.04);
@@ -943,7 +1112,60 @@ body {
   box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
 }
 
-.eq-rack-box.disabled .eq-presets-row {
+/* 10-Band Precision Sliders Drawer */
+.eq-sliders-drawer {
+  margin-top: 4px;
+  padding: 8px 6px 4px 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.eq-bands-cluster {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.eq-band-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.eq-band-val {
+  font-size: 0.52rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--neon-cyan);
+  min-height: 12px;
+}
+
+.eq-band-slider {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 14px;
+  height: 64px;
+  accent-color: var(--neon-cyan);
+  cursor: pointer;
+}
+
+.eq-band-lbl {
+  font-size: 0.52rem;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.eq-rack-box.disabled .eq-presets-row,
+.eq-rack-box.disabled .eq-sliders-drawer {
   opacity: 0.4;
   pointer-events: none;
 }
