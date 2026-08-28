@@ -803,7 +803,51 @@ class AudioEngine {
     }
     return { left: level, right: level * (0.9 + Math.random() * 0.2) };
   }
+
+  // Play a smooth tactile DSP chime confirming EQ / Spatial mode activation
+  playPresetPreviewCue(presetOrMode) {
+    if (!this.ctx) return;
+    try {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const now = this.ctx.currentTime;
+
+      if (presetOrMode === 'bass_booster' || presetOrMode === 'subwoofer') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(70, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.25);
+        if (navigator.vibrate) navigator.vibrate(60);
+      } else if (presetOrMode === 'vocal_enhancer' || presetOrMode === 'center') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
+      } else if (presetOrMode === 'concert_hall' || presetOrMode === '8d') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(780, now + 0.22);
+      } else if (presetOrMode === 'edm') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.15);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+      }
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } catch (e) {}
+  }
 }
+
 
 window.AudioEngine = AudioEngine;
 

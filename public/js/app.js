@@ -1517,7 +1517,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupEqualizerControls() {
     if (toggleEq) {
-      toggleEq.addEventListener('change', () => {
+      toggleEq.addEventListener('change', async () => {
+        await audioEngine.init();
         const enabled = toggleEq.checked;
         audioEngine.setEqEnabled(enabled);
         if (eqRackBox) {
@@ -1525,6 +1526,9 @@ document.addEventListener('DOMContentLoaded', () => {
           else eqRackBox.classList.add('disabled');
         }
         showToast(enabled ? '🎛️ Equalizer DSP: ENABLED' : '🎛️ Equalizer DSP: BYPASSED (OFF)');
+        if (enabled) {
+          audioEngine.playPresetPreviewCue(audioEngine.currentEqPreset || 'bass_booster');
+        }
         if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: 'set_eq_preset',
@@ -1536,11 +1540,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     eqPresetButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
+        await audioEngine.init();
         const preset = btn.dataset.preset;
         eqPresetButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         audioEngine.setEqPreset(preset);
+        audioEngine.playPresetPreviewCue(preset);
         showToast(`🎛️ Preset Applied: ${btn.textContent.trim()}`);
         if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
@@ -1554,9 +1560,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  function setSpatialModeUi(mode) {
+  async function setSpatialModeUi(mode) {
     currentSpatialMode = mode;
+    await audioEngine.init();
     audioEngine.setSpatialMode(mode);
+    audioEngine.playPresetPreviewCue(mode);
     modeButtons.forEach(b => {
       if (b.dataset.mode === mode) {
         b.classList.add('active');
@@ -1591,44 +1599,31 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchYouTubeResults('barsaat darshan raval');
   }
 
-  async function runYouTubeSearch() {
+  function runYouTubeSearch() {
     const q = ytSearchInput.value.trim();
     if (!q) return;
-
-    const match = q.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    if (match && match[1]) {
-      const videoId = match[1];
-      const autoplay = ytAutoplayCheckbox ? ytAutoplayCheckbox.checked : true;
-      playCustomYouTubeVideo(videoId, 'YouTube Stream', autoplay);
-      return;
-    }
-
-    fetchYouTubeResults(q);
+    fetchYouTubeResults(q, ytResultsScroll);
   }
 
   const ytClientCache = new Map();
 
-  async function fetchYouTubeResults(query, targetContainer = ytResultsScroll) {
-    const q = (query || '').trim().toLowerCase();
-    if (!q) return;
-
+  async function fetchYouTubeResults(q, targetContainer = ytResultsScroll) {
     if (ytClientCache.has(q)) {
       renderYouTubeResults(ytClientCache.get(q), targetContainer);
       return;
     }
-
     if (targetContainer) {
-      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">Searching YouTube...</div>';
+      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:20px 10px;">Searching YouTube Lite (144p)...</div>';
     }
     try {
-      const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       const results = data.results || [];
       ytClientCache.set(q, results);
       renderYouTubeResults(results, targetContainer);
     } catch (e) {
       if (targetContainer) {
-        targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--neon-red); text-align:center;">Search failed</div>';
+        targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--neon-red); text-align:center; padding:15px;">Search failed. Try again.</div>';
       }
     }
   }
@@ -1637,9 +1632,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!targetContainer) return;
     targetContainer.innerHTML = '';
     if (results.length === 0) {
-      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:10px;">No results found. Paste direct link above.</div>';
+      targetContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-tertiary); text-align:center; padding:24px 10px;">No results found. Paste direct YouTube URL above.</div>';
       return;
     }
+
+    // Scroll Header Hint
+    const countHint = document.createElement('div');
+    countHint.style.cssText = 'font-size:0.65rem; font-family:var(--font-mono); color:var(--neon-cyan); padding:2px 4px 6px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;';
+    countHint.innerHTML = `<span>⚡ ${results.length} SONGS FOUND (144p Lite)</span><span style="color:var(--text-tertiary);">↕ Scroll for all songs</span>`;
+    targetContainer.appendChild(countHint);
 
     results.forEach(item => {
       const card = document.createElement('div');

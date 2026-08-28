@@ -134,7 +134,7 @@ app.get('/api/youtube/search', (req, res) => {
               duration: v.lengthText?.simpleText || 'Live',
               thumbnail: v.thumbnail?.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`
             });
-            if (results.length >= 10) break;
+            if (results.length >= 25) break;
           }
         }
         ytSearchCache.set(cacheKey, { results, timestamp: Date.now() });
