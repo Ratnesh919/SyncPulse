@@ -82,9 +82,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const ytResultsScroll = document.getElementById('yt-results-scroll');
   const ytAutoplayCheckbox = document.getElementById('yt-autoplay-checkbox');
 
-  // Fleet Matrix
+  // Fleet Matrix & Acoustic Fleet Elements
   const fleetGrid = document.getElementById('fleet-grid');
   const deviceCountBadge = document.getElementById('device-count-badge');
+  const btnAutoDistributeFleet = document.getElementById('btn-auto-distribute-fleet');
+  const btnFleetSoundCheck = document.getElementById('btn-fleet-sound-check');
+
+  const CHANNEL_MAP = {
+    'all': { name: 'Full Stereo Master', icon: '◀▶', color: 'var(--neon-cyan)', badge: 'rgba(0, 242, 254, 0.15)', desc: 'Master full-spectrum stereo' },
+    'left': { name: 'Front Left', icon: '◀', color: 'var(--neon-cyan)', badge: 'rgba(0, 242, 254, 0.15)', desc: 'Left speaker with treble clarity' },
+    'right': { name: 'Front Right', icon: '▶', color: 'var(--neon-cyan)', badge: 'rgba(0, 242, 254, 0.15)', desc: 'Right speaker with treble clarity' },
+    'center': { name: 'Center (Vocals)', icon: '🎤', color: '#ffcc00', badge: 'rgba(255, 204, 0, 0.15)', desc: 'Vocal bandpass (280Hz-4.2kHz)' },
+    'subwoofer': { name: 'Subwoofer (Haptics)', icon: '🔊', color: '#ff0055', badge: 'rgba(255, 0, 85, 0.15)', desc: '<90Hz Bass + phone vibration' },
+    'rear-left': { name: 'Rear Left Surround', icon: '🌌', color: 'var(--neon-magenta)', badge: 'rgba(255, 0, 127, 0.15)', desc: '22ms Haas delay ambient' },
+    'rear-right': { name: 'Rear Right Surround', icon: '🌌', color: 'var(--neon-magenta)', badge: 'rgba(255, 0, 127, 0.15)', desc: '28ms Haas delay ambient' },
+    'height': { name: 'Overhead Atmos', icon: '☁️', color: '#00e5ff', badge: 'rgba(0, 229, 255, 0.15)', desc: '>5.5kHz highpass air shimmer' },
+    'fx-reverb': { name: 'Reverb Chamber', icon: '🏛️', color: '#b388ff', badge: 'rgba(179, 136, 255, 0.15)', desc: '100% wet space reflection' },
+    'traveling-orbit': { name: '360° Traveling Wave', icon: '🔄', color: '#00ffaa', badge: 'rgba(0, 255, 170, 0.15)', desc: 'Swelling wave rotating around room' }
+  };
 
   // Audio Calibrator Elements
   const btnAutoCalibrate = document.getElementById('btn-auto-calibrate');
@@ -958,7 +973,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       case 'channel_assigned':
         audioEngine.setChannelMode(msg.channel);
-        showToast(`🎚 Surround Channel Assigned: ${msg.channel.toUpperCase()}`);
+        if (typeof msg.swarmAngle === 'number') {
+          audioEngine.setNodeSwarmAngle(msg.swarmAngle);
+        }
+        const assignedInfo = CHANNEL_MAP[msg.channel] || { name: msg.channel.toUpperCase(), icon: '🎚' };
+        showToast(`🎚 Node Role: ${assignedInfo.icon} ${assignedInfo.name}`);
+        if (msg.channel === 'subwoofer' && navigator.vibrate) {
+          navigator.vibrate([120, 50, 120]);
+        }
+        break;
+
+      case 'fleet_orchestrated':
+        showToast(`⚡ Fleet Orchestrated: ${msg.deviceCount} nodes configured in Dolby matrix!`);
         break;
 
       case 'chat_message':
@@ -2349,22 +2375,22 @@ document.addEventListener('DOMContentLoaded', () => {
       card.style.cssText = 'background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px;';
 
       const pingStatusClass = peer.rtt < 30 ? 'color:var(--neon-emerald)' : (peer.rtt < 100 ? 'color:var(--neon-amber)' : 'color:var(--neon-red)');
+      const chInfo = CHANNEL_MAP[peer.channel] || { name: (peer.channel || 'all').toUpperCase(), icon: '🎚', color: 'var(--neon-cyan)', badge: 'rgba(0,242,254,0.15)', desc: 'Standard channel' };
 
       card.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <div class="node-avatar" style="width:32px; height:32px; border-radius:6px; background:rgba(0,242,254,0.1); border:1px solid var(--neon-cyan); display:flex; align-items:center; justify-content:center; color:var(--neon-cyan);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                <line x1="12" y1="18" x2="12.01" y2="18"></line>
-              </svg>
+            <div class="node-avatar" style="width:34px; height:34px; border-radius:8px; background:rgba(0,242,254,0.1); border:1px solid var(--neon-cyan); display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+              ${chInfo.icon}
             </div>
             <div>
               <div style="font-weight:700; font-size:0.88rem; color:#fff;">${peer.deviceName} ${isMe ? '<span style="color:var(--neon-cyan); font-size:0.7rem;">(You)</span>' : ''}</div>
-              <div style="font-size:0.68rem; color:var(--text-tertiary);">${peer.role.toUpperCase()}</div>
+              <div style="font-size:0.68rem; color:var(--text-tertiary);">${peer.role.toUpperCase()} • ${chInfo.desc}</div>
             </div>
           </div>
-          <span style="font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,0,127,0.15); color:var(--neon-magenta); border:1px solid rgba(255,0,127,0.4);">${peer.channel.toUpperCase()}</span>
+          <span style="font-size:0.68rem; font-weight:700; padding:3px 9px; border-radius:999px; background:${chInfo.badge}; color:${chInfo.color}; border:1px solid ${chInfo.color}; display:inline-flex; align-items:center; gap:4px;">
+            ${chInfo.icon} ${chInfo.name}
+          </span>
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; padding:8px 10px; background:rgba(0,0,0,0.35); border-radius:6px;">
@@ -2382,25 +2408,31 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        ${myRole === 'host' && !isMe ? `
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px; gap:6px;">
-            <div style="display:flex; align-items:center; gap:6px; flex:1;">
-              <span style="font-size:0.7rem; color:var(--text-tertiary); white-space:nowrap;">Dolby Ch:</span>
-              <select class="remote-channel-select" data-peer-id="${peer.id}" style="background:#030509; border:1px solid var(--border-medium); color:#fff; border-radius:4px; font-size:0.75rem; padding:3px 6px; flex:1;">
-                <option value="all" ${peer.channel === 'all' ? 'selected' : ''}>Full Stereo</option>
-                <option value="left" ${peer.channel === 'left' ? 'selected' : ''}>Front Left</option>
-                <option value="center" ${peer.channel === 'center' ? 'selected' : ''}>Center (Vocals)</option>
-                <option value="right" ${peer.channel === 'right' ? 'selected' : ''}>Front Right</option>
-                <option value="subwoofer" ${peer.channel === 'subwoofer' ? 'selected' : ''}>Subwoofer</option>
-                <option value="rear-left" ${peer.channel === 'rear-left' ? 'selected' : ''}>Rear Left</option>
-                <option value="rear-right" ${peer.channel === 'rear-right' ? 'selected' : ''}>Rear Right</option>
-              </select>
-            </div>
-            <button class="btn-kick-peer" data-peer-id="${peer.id}" style="background:rgba(255,51,102,0.15); border:1px solid rgba(255,51,102,0.4); color:var(--neon-red); border-radius:5px; padding:3px 8px; font-size:0.7rem; cursor:pointer; white-space:nowrap;">⛔ Kick</button>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px; gap:6px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:180px;">
+            <span style="font-size:0.7rem; color:var(--text-tertiary); white-space:nowrap;">Acoustic Role:</span>
+            <select class="remote-channel-select" data-peer-id="${peer.id}" ${myRole !== 'host' && !isMe ? 'disabled' : ''} style="background:#030509; border:1px solid var(--border-medium); color:#fff; border-radius:4px; font-size:0.75rem; padding:4px 6px; flex:1;">
+              <option value="all" ${peer.channel === 'all' ? 'selected' : ''}>◀▶ Full Stereo Master</option>
+              <option value="left" ${peer.channel === 'left' ? 'selected' : ''}>◀ Front Left Channel</option>
+              <option value="center" ${peer.channel === 'center' ? 'selected' : ''}>🎤 Center (Vocals & Lyrics)</option>
+              <option value="right" ${peer.channel === 'right' ? 'selected' : ''}>▶ Front Right Channel</option>
+              <option value="subwoofer" ${peer.channel === 'subwoofer' ? 'selected' : ''}>🔊 Subwoofer (Bass + Haptics)</option>
+              <option value="rear-left" ${peer.channel === 'rear-left' ? 'selected' : ''}>🌌 Rear Left Surround (Haas)</option>
+              <option value="rear-right" ${peer.channel === 'rear-right' ? 'selected' : ''}>🌌 Rear Right Surround (Haas)</option>
+              <option value="height" ${peer.channel === 'height' ? 'selected' : ''}>☁️ Overhead Atmos Height</option>
+              <option value="fx-reverb" ${peer.channel === 'fx-reverb' ? 'selected' : ''}>🏛️ Reverb Chamber Node</option>
+              <option value="traveling-orbit" ${peer.channel === 'traveling-orbit' ? 'selected' : ''}>🔄 360° Traveling Wave</option>
+            </select>
           </div>
-        ` : ''}
-      `;
 
+          <div style="display:flex; gap:5px;">
+            <button class="btn-test-node-chime" data-channel="${peer.channel}" style="background:rgba(0,242,254,0.12); border:1px solid rgba(0,242,254,0.35); color:var(--neon-cyan); border-radius:5px; padding:4px 9px; font-size:0.7rem; font-weight:700; cursor:pointer; white-space:nowrap;">🔊 Test</button>
+            ${myRole === 'host' && !isMe ? `
+              <button class="btn-kick-peer" data-peer-id="${peer.id}" style="background:rgba(255,51,102,0.15); border:1px solid rgba(255,51,102,0.4); color:var(--neon-red); border-radius:5px; padding:4px 8px; font-size:0.7rem; cursor:pointer; white-space:nowrap;">⛔ Kick</button>
+            ` : ''}
+          </div>
+        </div>
+      `;
 
       fleetGrid.appendChild(card);
     });
@@ -2409,11 +2441,32 @@ document.addEventListener('DOMContentLoaded', () => {
       sel.addEventListener('change', (e) => {
         const targetPeerId = e.target.dataset.peerId;
         const newChannel = e.target.value;
-        ws.send(JSON.stringify({
-          type: 'set_peer_channel',
-          targetPeerId,
-          channel: newChannel
-        }));
+        if (targetPeerId === myPeerId) {
+          audioEngine.setChannelMode(newChannel);
+          showToast(`🎚 Node Role: ${(CHANNEL_MAP[newChannel] || {}).name || newChannel}`);
+        }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'set_peer_channel',
+            targetPeerId,
+            channel: newChannel
+          }));
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-test-node-chime').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetCh = btn.dataset.channel;
+        if (myRole === 'host' && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'test_channel_cue',
+            targetChannel: targetCh
+          }));
+        } else {
+          audioEngine.playChannelTestBeep(targetCh);
+        }
+        showToast(`🔊 Sent Sound Check Tone to: ${(CHANNEL_MAP[targetCh] || {}).name || targetCh}`);
       });
     });
 
@@ -2425,6 +2478,25 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('⛔ Device removed from room');
         }
       });
+    });
+  }
+
+  // Setup Fleet Orchestration Actions
+  if (btnAutoDistributeFleet) {
+    btnAutoDistributeFleet.addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'auto_distribute_fleet' }));
+        showToast('⚡ Auto-Distributing nodes into 5.1/7.1 acoustic fleet...');
+      }
+    });
+  }
+
+  if (btnFleetSoundCheck) {
+    btnFleetSoundCheck.addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'fleet_sound_check' }));
+        showToast('🔊 Running sequential fleet sound check sweep...');
+      }
     });
   }
 

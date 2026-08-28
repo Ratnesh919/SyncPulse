@@ -677,12 +677,13 @@
     <section id="panel-fleet" class="tab-panel">
       <div style="background:var(--bg-card); backdrop-filter:blur(24px); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
-          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:700; color:#fff;">Connected Dolby Audio Nodes</h2>
-          <p style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Assign each phone as Front, Center, Rear, or Subwoofer (with mobile haptic bass vibration!).</p>
+          <h2 style="font-family:var(--font-display); font-size:1.1rem; font-weight:700; color:#fff;">Connected Spatial Audio Fleet</h2>
+          <p style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">Use all connected phones as dedicated speakers for different audio effects (Subwoofer Haptics, Vocals, Surround, Atmos Height, Reverb Chamber).</p>
         </div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="document.getElementById('btn-edit-device').click()" class="btn-glass-secondary" style="font-size:0.8rem; padding:8px 14px;">✏️ Rename Device</button>
-          <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="font-size:0.8rem; padding:8px 16px;">+ Connect Phone</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btn-auto-distribute-fleet" class="btn-solid-primary" style="font-size:0.8rem; padding:8px 14px; background:linear-gradient(135deg, #00f2fe, #4facfe); border:none; display:flex; align-items:center; gap:6px;">⚡ Auto-Distribute Roles</button>
+          <button id="btn-fleet-sound-check" class="btn-glass-secondary" style="font-size:0.8rem; padding:8px 14px; display:flex; align-items:center; gap:6px;">🔊 Sound Check</button>
+          <button onclick="document.getElementById('btn-share-qr').click()" class="btn-glass-secondary" style="font-size:0.8rem; padding:8px 14px;">+ Add Device</button>
         </div>
       </div>
 

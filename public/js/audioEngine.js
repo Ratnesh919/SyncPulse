@@ -23,7 +23,7 @@ class AudioEngine {
     this.orbitSpeed = 0.018; // Smooth realistic rotation (one full circle ~350 frames ≈ 6 sec)
     this.pannerAnimId = null;
 
-    // Dolby Matrix DSP Nodes
+    // Dolby Matrix DSP & Distributed Acoustic Fleet Nodes
     this.splitter = null;
     this.merger = null;
     this.centerBandpass = null;
@@ -34,6 +34,13 @@ class AudioEngine {
     this.surroundDelayRight = null;
     this.surroundFilter = null;
     this.inverter = null;
+    this.heightHighpass = null;
+    this.heightGain = null;
+    this.reverbChamberConvolver = null;
+    this.reverbChamberGain = null;
+    this.swarmGainNode = null;
+    this.nodeSwarmAngleDeg = 0; // Physical angle of this node in room (0-360)
+    this.lastSubHapticTime = 0;
 
     this.currentSource = null;
     this.currentBuffer = null;
@@ -242,6 +249,24 @@ class AudioEngine {
     this.inverter = this.ctx.createGain();
     this.inverter.gain.value = -1.0;
 
+    // Atmos Overhead / Height Channel (>5.5kHz Highpass + Air presence)
+    this.heightHighpass = this.ctx.createBiquadFilter();
+    this.heightHighpass.type = 'highpass';
+    this.heightHighpass.frequency.value = 5500;
+    this.heightHighpass.Q.value = 1.0;
+    this.heightGain = this.ctx.createGain();
+    this.heightGain.gain.value = 1.8;
+
+    // Reverb Chamber Node (100% Wet lush acoustic space generator)
+    this.reverbChamberConvolver = this.ctx.createConvolver();
+    this.reverbChamberConvolver.buffer = this.createCathedralImpulse(3.6, 1.8);
+    this.reverbChamberGain = this.ctx.createGain();
+    this.reverbChamberGain.gain.value = 1.6;
+
+    // Traveling Wave Orbit Node
+    this.swarmGainNode = this.ctx.createGain();
+    this.swarmGainNode.gain.value = 1.0;
+
     this.autoCalibrateHardwareDelay();
     this.applyAudioRouting();
     this.start8DOrbitLoop();
@@ -284,6 +309,10 @@ class AudioEngine {
     this.applyAudioRouting();
   }
 
+  setNodeSwarmAngle(angleDeg) {
+    this.nodeSwarmAngleDeg = ((angleDeg % 360) + 360) % 360;
+  }
+
   set360Position(azimuthDeg, elevationDeg = 0, distanceM = 3.0) {
     this.spatial360Azimuth = ((azimuthDeg % 360) + 360) % 360;
     this.spatial360Elevation = Math.max(-85, Math.min(85, elevationDeg));
@@ -316,6 +345,15 @@ class AudioEngine {
       const isBehind = z < 0;
       const targetCutoff = isBehind ? (3200 + (1 + z / this.spatial360Distance) * 4800) : 20000;
       this.headShadowFilter.frequency.setTargetAtTime(targetCutoff, now, 0.06);
+    }
+
+    // Multi-device traveling wave modulation
+    if (this.swarmGainNode && this.channelMode === 'traveling-orbit') {
+      const diffDeg = Math.abs(this.spatial360Azimuth - this.nodeSwarmAngleDeg);
+      const shortestDiff = Math.min(diffDeg, 360 - diffDeg);
+      const normDist = shortestDiff / 180; // 0 (exact match) to 1 (opposite)
+      const swellGain = Math.max(0.08, Math.pow(Math.cos(normDist * Math.PI / 2), 2) * 2.2);
+      this.swarmGainNode.gain.setTargetAtTime(swellGain, now, 0.05);
     }
 
     if (this.on360PositionUpdateCallback) {
@@ -354,11 +392,16 @@ class AudioEngine {
     safeDisconnect(this.surroundDelayLeft);
     safeDisconnect(this.surroundDelayRight);
     safeDisconnect(this.surroundFilter);
+    safeDisconnect(this.heightHighpass);
+    safeDisconnect(this.heightGain);
+    safeDisconnect(this.reverbChamberConvolver);
+    safeDisconnect(this.reverbChamberGain);
+    safeDisconnect(this.swarmGainNode);
     safeDisconnect(this.analyser);
 
     try {
       // Mode 1: 3D HRTF 8D & 360° Real Space Binaural Panning
-      if ((this.spatialMode === '8d' || this.spatialMode === '360' || this.spatialMode === 'cathedral') && this.panner3D) {
+      if ((this.spatialMode === '8d' || this.spatialMode === '360' || this.spatialMode === 'cathedral') && this.panner3D && this.channelMode === 'all') {
         this.gainNode.connect(this.headShadowFilter);
         this.headShadowFilter.connect(this.panner3D);
         this.panner3D.connect(this.analyser);
@@ -366,7 +409,7 @@ class AudioEngine {
         return;
       }
 
-      // Mode 2: Dolby multi-channel routing based on assigned channel
+      // Mode 2: Dolby & Distributed Multi-Device Fleet Routing
       if (this.channelMode === 'left') {
         this.gainNode.connect(this.splitter);
         this.splitter.connect(this.merger, 0, 0);
@@ -397,8 +440,22 @@ class AudioEngine {
         this.surroundDelayRight.connect(this.surroundFilter);
         this.surroundFilter.connect(this.merger, 0, 1);
         this.merger.connect(this.analyser);
+      } else if (this.channelMode === 'height') {
+        // Atmos Overhead: >5.5kHz highpass shimmer
+        this.gainNode.connect(this.heightHighpass);
+        this.heightHighpass.connect(this.heightGain);
+        this.heightGain.connect(this.analyser);
+      } else if (this.channelMode === 'fx-reverb') {
+        // Dedicated room reverb reflection generator
+        this.gainNode.connect(this.reverbChamberConvolver);
+        this.reverbChamberConvolver.connect(this.reverbChamberGain);
+        this.reverbChamberGain.connect(this.analyser);
+      } else if (this.channelMode === 'traveling-orbit') {
+        // Physical traveling wave modulated across room nodes
+        this.gainNode.connect(this.swarmGainNode);
+        this.swarmGainNode.connect(this.analyser);
       } else {
-        // Default: Full Stereo (normal or dolby-all)
+        // Default: Full Stereo (all)
         this.gainNode.connect(this.analyser);
       }
 
@@ -818,25 +875,66 @@ class AudioEngine {
     const isMe = (this.channelMode === targetChannel || targetChannel === 'all');
     if (!isMe) return;
 
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    try {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
 
-    osc.type = targetChannel === 'subwoofer' ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(targetChannel === 'subwoofer' ? 65 : 880, this.ctx.currentTime);
+      if (targetChannel === 'subwoofer') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(55, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.5);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(1.0, now + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+      } else if (targetChannel === 'center') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1000, now);
+        osc.frequency.exponentialRampToValueAtTime(1500, now + 0.35);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.7, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      } else if (targetChannel === 'left') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.7, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      } else if (targetChannel === 'right') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.7, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      } else if (targetChannel === 'height') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2400, now);
+        osc.frequency.exponentialRampToValueAtTime(3200, now + 0.3);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.6, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      } else if (targetChannel === 'fx-reverb') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.6, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.7, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      }
 
-    gain.gain.setValueAtTime(0, this.ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.8, this.ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.6);
-
-    if (targetChannel === 'subwoofer' && navigator.vibrate) {
-      navigator.vibrate([100, 50, 100]);
-    }
+      osc.start(now);
+      osc.stop(now + 0.65);
+    } catch (e) {}
   }
 
   getFrequencyData() {

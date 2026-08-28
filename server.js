@@ -486,6 +486,74 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        // Host: Auto-Distribute Fleet Acoustic Roles
+        case 'auto_distribute_fleet': {
+          const room = rooms.get(currentRoomId);
+          if (room && isHostSender(room, ws, msg)) {
+            const peersList = Array.from(room.peers.entries());
+            const count = peersList.length;
+
+            let roleScheme = ['all'];
+            if (count === 2) {
+              roleScheme = ['left', 'right'];
+            } else if (count === 3) {
+              roleScheme = ['left', 'right', 'subwoofer'];
+            } else if (count === 4) {
+              roleScheme = ['left', 'center', 'right', 'subwoofer'];
+            } else if (count === 5) {
+              roleScheme = ['left', 'center', 'right', 'subwoofer', 'rear-left'];
+            } else if (count === 6) {
+              roleScheme = ['left', 'center', 'right', 'subwoofer', 'rear-left', 'rear-right'];
+            } else if (count === 7) {
+              roleScheme = ['left', 'center', 'right', 'subwoofer', 'rear-left', 'rear-right', 'height'];
+            } else if (count >= 8) {
+              roleScheme = ['left', 'center', 'right', 'subwoofer', 'rear-left', 'rear-right', 'height', 'fx-reverb'];
+            }
+
+            peersList.forEach(([peerWs, peer], idx) => {
+              const assigned = roleScheme[idx % roleScheme.length] || 'all';
+              peer.channel = assigned;
+              try {
+                peerWs.send(JSON.stringify({
+                  type: 'channel_assigned',
+                  channel: assigned,
+                  swarmAngle: Math.round((idx / count) * 360)
+                }));
+              } catch (e) {}
+            });
+
+            broadcastRoomPeers(room);
+            broadcastToRoom(room, {
+              type: 'fleet_orchestrated',
+              deviceCount: count,
+              scheme: roleScheme
+            });
+          }
+          break;
+        }
+
+        // Host: Run Sequential Multi-Device Fleet Sound Check Sweep
+        case 'fleet_sound_check': {
+          const room = rooms.get(currentRoomId);
+          if (room && isHostSender(room, ws, msg)) {
+            const channels = ['left', 'center', 'right', 'subwoofer', 'rear-left', 'rear-right', 'height', 'fx-reverb'];
+            channels.forEach((ch, idx) => {
+              setTimeout(() => {
+                const currentRoom = rooms.get(currentRoomId);
+                if (currentRoom) {
+                  broadcastToRoom(currentRoom, {
+                    type: 'test_channel_cue',
+                    targetChannel: ch,
+                    stepIndex: idx,
+                    totalSteps: channels.length
+                  });
+                }
+              }, idx * 600);
+            });
+          }
+          break;
+        }
+
         // Live Room Chat Message
         case 'chat_message': {
           const room = rooms.get(currentRoomId);
