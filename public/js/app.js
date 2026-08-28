@@ -1658,6 +1658,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (queueBtn) {
         queueBtn.addEventListener('click', (e) => {
           e.stopPropagation();
+          const origText = queueBtn.textContent;
+          queueBtn.textContent = '✓ Queued!';
+          queueBtn.style.background = 'rgba(0, 242, 254, 0.3)';
+          queueBtn.style.borderColor = 'var(--neon-cyan)';
+          queueBtn.style.color = '#fff';
+
+          setTimeout(() => {
+            queueBtn.textContent = origText;
+            queueBtn.style.background = '';
+            queueBtn.style.borderColor = '';
+            queueBtn.style.color = '';
+          }, 1200);
+
           addTrackToQueue({
             id: `yt-${item.id}`,
             title: item.title,
@@ -1669,6 +1682,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
       }
+
 
       card.addEventListener('click', () => {
         if (myRole === 'guest') {
@@ -2425,7 +2439,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!dashboardQueueScroll) return;
 
-    if (currentQueue.length === 0) {
+    if (!currentQueue || currentQueue.length === 0) {
       dashboardQueueScroll.innerHTML = `
         <div class="upcoming-queue-empty">
           <span style="font-size:1.2rem; opacity:0.8;">🎶</span>
@@ -2439,19 +2453,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     currentQueue.forEach((item, index) => {
       const isRank1 = index === 0;
+      const track = item.track || item || {};
+      const title = track.title || item.title || 'Unknown Title';
+      const artist = track.artist || item.artist || 'YouTube';
+      const thumbnail = track.thumbnail || item.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIzNiI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzIyMiIvPjwvc3ZnPg==';
+      const videoId = track.youtubeVideoId || track.id || item.youtubeVideoId || item.id || '';
+      const addedBy = item.addedBy || 'Guest';
+      const votes = typeof item.votes === 'number' ? item.votes : 1;
+      const queueId = item.queueId || '';
 
       const row = document.createElement('div');
       row.className = `queue-dash-card ${isRank1 ? 'rank-1' : ''}`;
       row.innerHTML = `
         <div class="queue-dash-rank">${isRank1 ? '👑' : '#' + (index + 1)}</div>
-        <img src="${item.track.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIzNiI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzIyMiIvPjwvc3ZnPg=='}" class="queue-dash-thumb" alt="Thumb">
+        <img src="${thumbnail}" class="queue-dash-thumb" alt="Thumb">
         <div class="queue-dash-info">
-          <div class="queue-dash-title">${item.track.title}</div>
-          <div class="queue-dash-sub">${item.track.artist || 'YouTube'} • Added by ${item.addedBy || 'Guest'}</div>
+          <div class="queue-dash-title">${title}</div>
+          <div class="queue-dash-sub">${artist} • Added by ${addedBy}</div>
         </div>
         <button class="queue-dash-vote-btn" title="Upvote Song">
           <span>🔥</span>
-          <span>${item.votes > 0 ? '+' : ''}${item.votes}</span>
+          <span>${votes > 0 ? '+' : ''}${votes}</span>
         </button>
         ${myRole === 'host' ? `
           <button class="queue-dash-play-btn" title="Play This Song Now">Play</button>
@@ -2468,7 +2490,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'queue_vote',
-              queueId: item.queueId,
+              queueId: queueId,
               direction: 'up'
             }));
           }
@@ -2482,9 +2504,9 @@ document.addEventListener('DOMContentLoaded', () => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'queue_remove',
-              queueId: item.queueId
+              queueId: queueId
             }));
-            playCustomYouTubeVideo(item.track.youtubeVideoId, item.track.title, true);
+            playCustomYouTubeVideo(videoId, title, true);
           }
         });
       }
@@ -2496,7 +2518,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'queue_remove',
-              queueId: item.queueId
+              queueId: queueId
             }));
           }
         });
@@ -2505,6 +2527,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dashboardQueueScroll.appendChild(row);
     });
   }
+
 
   function renderJukeboxQueue() {
     if (queueCountDisplay) queueCountDisplay.textContent = currentQueue.length;

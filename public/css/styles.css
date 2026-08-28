@@ -1272,8 +1272,8 @@ body {
   flex-direction: column;
   gap: 12px;
   box-shadow: var(--shadow-elevated);
-  height: 580px;
-  max-height: 580px;
+  height: 600px;
+  max-height: 600px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -1363,10 +1363,10 @@ body {
 }
 
 .yt-results-scroll {
-  flex: 1;
-  height: calc(100% - 90px);
-  max-height: 480px;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  height: 490px;
+  max-height: 490px;
+  overflow-y: auto !important;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
@@ -1374,6 +1374,7 @@ body {
   padding-right: 4px;
   box-sizing: border-box;
 }
+
 
 .yt-results-scroll::-webkit-scrollbar {
   width: 6px;
@@ -2048,10 +2049,16 @@ body {
     min-height: unset;
   }
   .mini-youtube-panel {
-    height: auto;
-    min-height: unset;
+    height: 540px;
+    max-height: 540px;
+  }
+  .yt-results-scroll {
+    height: 440px;
+    max-height: 440px;
+    overflow-y: auto !important;
   }
 }
+
 
 
 
@@ -2298,14 +2305,19 @@ body {
   .volume-bar-box { gap: 8px; }
   .vol-percent-badge { font-size: 0.7rem; }
 
-  /* Mini YouTube panel: compact height */
+  /* Mini YouTube panel: compact fixed scroll height */
   .mini-youtube-panel {
-    height: auto;
-    max-height: 280px;
+    height: 500px;
+    max-height: 500px;
     border-radius: 10px;
   }
-  .yt-results-scroll { max-height: 200px; }
+  .yt-results-scroll {
+    height: 400px;
+    max-height: 400px;
+    overflow-y: auto !important;
+  }
   .yt-result-card { gap: 8px; padding: 8px 10px; }
+
   .yt-thumb { width: 56px; height: 40px; }
   .yt-video-title { font-size: 0.72rem; -webkit-line-clamp: 2; }
   .yt-video-channel { font-size: 0.62rem; }
