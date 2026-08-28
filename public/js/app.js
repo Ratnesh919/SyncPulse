@@ -238,8 +238,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
   }
 
+  let hostSyncHeartbeatTimer = null;
+
+  function broadcastHostSyncTick() {
+    if (myRole !== 'host' || !ws || ws.readyState !== WebSocket.OPEN || !currentTrack) {
+      return;
+    }
+
+    let isPlaying = false;
+    let pos = 0;
+
+    if (currentTrack.type === 'youtube') {
+      if (ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+        const state = ytPlayer.getPlayerState();
+        isPlaying = (state === 1); // 1 = PLAYING
+        pos = (typeof ytPlayer.getCurrentTime === 'function') ? (ytPlayer.getCurrentTime() || 0) : 0;
+      }
+    } else {
+      isPlaying = audioEngine.isPlaying;
+      pos = audioEngine.getCurrentPlaybackPosition();
+    }
+
+    if (isPlaying) {
+      const masterTime = syncEngine ? syncEngine.now() : performance.now();
+      ws.send(JSON.stringify({
+        type: 'host_playback_sync',
+        position: pos,
+        masterTime: masterTime,
+        isPlaying: true,
+        sourceType: currentTrack.type || 'youtube',
+        youtubeVideoId: currentTrack.youtubeVideoId || null,
+        trackId: currentTrack.id || null
+      }));
+    }
+  }
+
+  function startHostSyncBroadcast() {
+    if (hostSyncHeartbeatTimer) clearInterval(hostSyncHeartbeatTimer);
+    hostSyncHeartbeatTimer = setInterval(() => {
+      broadcastHostSyncTick();
+    }, 2000);
+  }
+
+  function stopHostSyncBroadcast() {
+    if (hostSyncHeartbeatTimer) {
+      clearInterval(hostSyncHeartbeatTimer);
+      hostSyncHeartbeatTimer = null;
+    }
+  }
+
   function updateRoleUi() {
     if (myRole === 'guest') {
+      stopHostSyncBroadcast();
       if (guestLockNotice) guestLockNotice.style.display = 'flex';
       if (btnPlay) btnPlay.classList.add('guest-disabled-control');
       if (btnStop) btnStop.classList.add('guest-disabled-control');
@@ -247,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnNextTrack) btnNextTrack.classList.add('guest-disabled-control');
       if (progressBar) progressBar.classList.add('guest-disabled-control');
     } else {
+      startHostSyncBroadcast();
       if (guestLockNotice) guestLockNotice.style.display = 'none';
       if (btnPlay) btnPlay.classList.remove('guest-disabled-control');
       if (btnStop) btnStop.classList.remove('guest-disabled-control');
@@ -255,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (progressBar) progressBar.classList.remove('guest-disabled-control');
     }
   }
+
 
   let isAutoAtmosphere = true;
   let manualSelectedTheme = null;
@@ -800,20 +852,73 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
 
 
+      case 'host_sync_tick': {
+        if (myRole === 'host') break; // Host is the clock master
+
+        const currentMasterTime = syncEngine ? syncEngine.now() : performance.now();
+        const elapsedSec = Math.max(0, (currentMasterTime - msg.masterTime) / 1000);
+        const expectedHostPos = msg.position + (msg.isPlaying ? elapsedSec : 0);
+
+        if (msg.roomMasterStartTime) {
+          audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
+        }
+
+        if (msg.sourceType === 'youtube' || (currentTrack && currentTrack.type === 'youtube')) {
+          const videoId = msg.youtubeVideoId || (currentTrack && currentTrack.youtubeVideoId);
+          if (!ytPlayer || !isYtReady) {
+            if (msg.isPlaying && videoId) {
+              handleYouTubePlayCue(videoId, expectedHostPos);
+            }
+          } else {
+            const localYtPos = (typeof ytPlayer.getCurrentTime === 'function') ? (ytPlayer.getCurrentTime() || 0) : 0;
+            const ytState = (typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : -1;
+            const driftSec = localYtPos - expectedHostPos;
+            const driftMs = Math.round(driftSec * 1000);
+
+            // If Host is playing but guest is paused / ended / unstarted
+            if (msg.isPlaying && ytState !== 1 && ytState !== 3) {
+              ytPlayer.seekTo(expectedHostPos, true);
+              ytPlayer.playVideo();
+              setPlayButtonState(true);
+            } else if (!msg.isPlaying && ytState === 1) {
+              ytPlayer.pauseVideo();
+              setPlayButtonState(false);
+            } else if (msg.isPlaying && ytState === 1) {
+              // Drift detection vs Host (> 300ms delay, e.g. 3rd phone joined late or buffering)
+              if (Math.abs(driftMs) > 300) {
+                console.warn(`[SyncPulse] YouTube drift vs Host: ${driftMs}ms. Snap-resyncing to Host...`);
+                ytPlayer.seekTo(expectedHostPos, true);
+                if (autoSyncBadgeText) {
+                  autoSyncBadgeText.textContent = `⚡ Synced to Host (${driftMs > 0 ? '+' : ''}${driftMs}ms)`;
+                }
+              } else {
+                if (autoSyncBadgeText) {
+                  autoSyncBadgeText.textContent = `⚡ Synced to Host (±${Math.abs(driftMs)}ms)`;
+                }
+              }
+            }
+          }
+        } else if (currentTrack && currentTrack.url) {
+          // WebAudio drift check is automatically handled by continuous auto-sync against roomMasterStartTime
+        }
+        break;
+      }
+
       case 'room_sync_pulse':
         if (msg.roomMasterStartTime) {
           audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
         }
-        if (currentTrack && currentTrack.type === 'youtube' && ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 1) {
+        if (myRole !== 'host' && currentTrack && currentTrack.type === 'youtube' && ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 1) {
           const expectedYtPos = (syncEngine.now() - msg.roomMasterStartTime) / 1000;
           const actualYtPos = (ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0);
           const ytDrift = expectedYtPos - actualYtPos;
-          if (Math.abs(ytDrift) > 0.4) {
-            console.warn(`[SyncPulse YouTube Auto-Sync] Drift detected: ${Math.round(ytDrift * 1000)}ms. Resyncing...`);
-            ytPlayer.seekTo(expectedYtPos + 0.05, true);
+          if (Math.abs(ytDrift) > 0.3) {
+            console.warn(`[SyncPulse YouTube Auto-Sync] Drift detected: ${Math.round(ytDrift * 1000)}ms. Resyncing to Host...`);
+            ytPlayer.seekTo(expectedYtPos + 0.04, true);
           }
         }
         break;
+
 
       case 'spatial_mode_changed':
         setSpatialModeUi(msg.spatialMode);

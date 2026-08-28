@@ -343,6 +343,43 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        // Host: Periodic Playback Synchronization Broadcast (Master Clock Anchor)
+        case 'host_playback_sync': {
+          const room = rooms.get(currentRoomId);
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+            const nowMs = getServerMasterTime();
+            const hostPosition = typeof msg.position === 'number' ? msg.position : (room.playbackState.position || 0);
+            const hostMasterTime = typeof msg.masterTime === 'number' ? msg.masterTime : nowMs;
+            const roomMasterStartTime = hostMasterTime - (hostPosition * 1000);
+
+            room.playbackState = {
+              ...room.playbackState,
+              isPlaying: !!msg.isPlaying,
+              position: hostPosition,
+              targetMasterTime: hostMasterTime,
+              roomMasterStartTime,
+              sourceType: msg.sourceType || room.playbackState.sourceType || 'audio',
+              youtubeVideoId: msg.youtubeVideoId || room.playbackState.youtubeVideoId,
+              trackId: msg.trackId || (room.currentTrack ? room.currentTrack.id : null),
+              lastHostSyncServerTime: nowMs
+            };
+
+            // Broadcast host synchronization tick to all other nodes in the room
+            broadcastToRoom(room, {
+              type: 'host_sync_tick',
+              position: hostPosition,
+              masterTime: hostMasterTime,
+              roomMasterStartTime,
+              isPlaying: room.playbackState.isPlaying,
+              sourceType: room.playbackState.sourceType,
+              youtubeVideoId: room.playbackState.youtubeVideoId,
+              trackId: room.playbackState.trackId,
+              serverTime: nowMs
+            }, ws);
+          }
+          break;
+        }
+
         // Host: Change Track (Host Only)
         case 'change_track': {
           const room = rooms.get(currentRoomId);
