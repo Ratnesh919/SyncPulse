@@ -147,10 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const upNextTitle = document.getElementById('up-next-title');
   const upNextSubtitle = document.getElementById('up-next-subtitle');
   const upNextVotesBadge = document.getElementById('up-next-votes-badge');
-  const btnUpNextSkip = document.getElementById('btn-up-next-skip');
+  // Dashboard Upcoming Queue Card Elements
+  const dashboardQueueScroll = document.getElementById('dashboard-queue-scroll');
+  const dashboardQueueCount = document.getElementById('dashboard-queue-count');
+  const btnDashboardQueueClear = document.getElementById('btn-dashboard-queue-clear');
 
   // Auto-DJ Crossfade Elements
   const crossfadeButtons = document.querySelectorAll('.crossfade-btn');
+
 
 
   // 24/7 Live Radio Stations Elements
@@ -744,6 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
       case 'play_cue':
+        isCrossfading = false;
         currentTrack = msg.track || currentTrack;
         if (currentTrack) updateTrackUi(currentTrack);
         if (msg.roomMasterStartTime) {
@@ -830,6 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
       case 'track_changed':
+        isCrossfading = false;
         currentTrack = msg.track || currentTrack;
         if (!currentTrack) break;
         if (msg.roomMasterStartTime) {
@@ -1769,13 +1775,16 @@ document.addEventListener('DOMContentLoaded', () => {
             setPlayButtonState(false);
           } else if (event.data === YT.PlayerState.ENDED) {
             setPlayButtonState(false);
-            if (myRole === 'host' && currentQueue && currentQueue.length > 0) {
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                  type: 'queue_pop_next',
-                  crossfadeSec: crossfadeDuration,
-                  isAutoTransition: true
-                }));
+            isCrossfading = false;
+            if (myRole === 'host') {
+              if (currentQueue && currentQueue.length > 0) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({
+                    type: 'queue_pop_next',
+                    crossfadeSec: crossfadeDuration,
+                    isAutoTransition: true
+                  }));
+                }
               }
             }
           }
@@ -1790,6 +1799,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleYouTubeTrackChange(videoId, autoplay) {
+    isCrossfading = false;
     if (!ytPlayer || !isYtReady) {
       initYouTubePlayer(videoId, () => {
         enforceLowestYouTubeQuality(ytPlayer);
@@ -1802,6 +1812,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (autoplay) {
         ytPlayer.loadVideoById({ videoId, suggestedQuality: 'tiny' });
         enforceLowestYouTubeQuality(ytPlayer);
+        if (typeof ytPlayer.playVideo === 'function') {
+          ytPlayer.playVideo();
+        }
         setPlayButtonState(true);
       } else {
         ytPlayer.cueVideoById({ videoId, suggestedQuality: 'tiny' });
@@ -1809,6 +1822,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
 
   function handleYouTubePlayCue(videoId, startPos) {
     if (!ytPlayer || !isYtReady) {
@@ -1998,13 +2012,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+    // Dynamic L and R VU Meters & dB Readout Engine
     if (vuBarLeft && vuBarRight) {
-      const vu = audioEngine.getVuLevels();
-      vuBarLeft.style.width = `${vu.left * 100}%`;
-      vuBarRight.style.width = `${vu.right * 100}%`;
+      let isYtPlaying = false;
+      if (currentTrack && currentTrack.type === 'youtube' && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+        isYtPlaying = (ytPlayer.getPlayerState() === 1);
+      }
+
+      let vu;
+      if (isYtPlaying) {
+        const time = performance.now() * 0.0035;
+        const beat1 = Math.abs(Math.sin(time * 4.4));
+        const beat2 = Math.abs(Math.cos(time * 2.2));
+        const transient = (beat1 * 0.65 + beat2 * 0.35);
+        const baseLevel = 0.35 + transient * 0.55;
+
+        if (currentSpatialMode === '8d' || audioEngine.spatialMode === '8d') {
+          const pan = Math.sin(audioEngine.orbitAngle || 0);
+          vu = {
+            left: Math.max(0.04, Math.min(0.98, baseLevel * (1 - pan * 0.75))),
+            right: Math.max(0.04, Math.min(0.98, baseLevel * (1 + pan * 0.75)))
+          };
+        } else {
+          const flutter = (Math.random() - 0.5) * 0.08;
+          vu = {
+            left: Math.max(0.04, Math.min(0.98, baseLevel + flutter)),
+            right: Math.max(0.04, Math.min(0.98, baseLevel - flutter))
+          };
+        }
+      } else {
+        vu = audioEngine.getVuLevels();
+      }
+
+      vuBarLeft.style.width = `${(vu.left * 100).toFixed(1)}%`;
+      vuBarRight.style.width = `${(vu.right * 100).toFixed(1)}%`;
+
       if (vuDbReadout) {
         const peak = Math.max(vu.left, vu.right);
-        if (peak > 0.01) {
+        if (peak > 0.05) {
           const db = Math.round(20 * Math.log10(peak));
           vuDbReadout.textContent = `${db >= 0 ? '+' : ''}${db} dB`;
         } else {
@@ -2012,6 +2057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     }
+
 
     requestAnimationFrame(updatePlaybackProgress);
   }
@@ -2279,6 +2325,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    if (btnDashboardQueueClear) {
+      btnDashboardQueueClear.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can clear the upcoming queue');
+          return;
+        }
+        if (currentQueue.length === 0) return;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'queue_clear' }));
+          showToast('🗑️ Cleared Upcoming Queue');
+        }
+      });
+    }
+
     if (btnUpNextSkip) {
       btnUpNextSkip.addEventListener('click', () => {
         if (myRole === 'guest') {
@@ -2357,9 +2417,98 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function renderDashboardQueue() {
+    if (dashboardQueueCount) {
+      dashboardQueueCount.textContent = `${currentQueue.length} ${currentQueue.length === 1 ? 'Song' : 'Songs'}`;
+    }
+
+    if (!dashboardQueueScroll) return;
+
+    if (currentQueue.length === 0) {
+      dashboardQueueScroll.innerHTML = `
+        <div class="upcoming-queue-empty">
+          <span style="font-size:1.2rem; opacity:0.8;">🎶</span>
+          <span>No upcoming songs in queue. Click <strong>+ Queue</strong> on any YouTube song to add!</span>
+        </div>
+      `;
+      return;
+    }
+
+    dashboardQueueScroll.innerHTML = '';
+
+    currentQueue.forEach((item, index) => {
+      const isRank1 = index === 0;
+
+      const row = document.createElement('div');
+      row.className = `queue-dash-card ${isRank1 ? 'rank-1' : ''}`;
+      row.innerHTML = `
+        <div class="queue-dash-rank">${isRank1 ? '👑' : '#' + (index + 1)}</div>
+        <img src="${item.track.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIzNiI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzIyMiIvPjwvc3ZnPg=='}" class="queue-dash-thumb" alt="Thumb">
+        <div class="queue-dash-info">
+          <div class="queue-dash-title">${item.track.title}</div>
+          <div class="queue-dash-sub">${item.track.artist || 'YouTube'} • Added by ${item.addedBy || 'Guest'}</div>
+        </div>
+        <button class="queue-dash-vote-btn" title="Upvote Song">
+          <span>🔥</span>
+          <span>${item.votes > 0 ? '+' : ''}${item.votes}</span>
+        </button>
+        ${myRole === 'host' ? `
+          <button class="queue-dash-play-btn" title="Play This Song Now">Play</button>
+          <button class="queue-dash-remove-btn" title="Remove">✕</button>
+        ` : (item.addedByPeerId === myPeerId ? `
+          <button class="queue-dash-remove-btn" title="Remove">✕</button>
+        ` : '')}
+      `;
+
+      // Upvote click
+      const voteBtn = row.querySelector('.queue-dash-vote-btn');
+      if (voteBtn) {
+        voteBtn.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_vote',
+              queueId: item.queueId,
+              direction: 'up'
+            }));
+          }
+        });
+      }
+
+      // Host Play Now
+      const playBtn = row.querySelector('.queue-dash-play-btn');
+      if (playBtn) {
+        playBtn.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_remove',
+              queueId: item.queueId
+            }));
+            playCustomYouTubeVideo(item.track.youtubeVideoId, item.track.title, true);
+          }
+        });
+      }
+
+      // Remove
+      const removeBtn = row.querySelector('.queue-dash-remove-btn');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'queue_remove',
+              queueId: item.queueId
+            }));
+          }
+        });
+      }
+
+      dashboardQueueScroll.appendChild(row);
+    });
+  }
+
   function renderJukeboxQueue() {
     if (queueCountDisplay) queueCountDisplay.textContent = currentQueue.length;
     updateUpNextPreview();
+    renderDashboardQueue();
 
     if (!jukeboxQueueList) return;
 
@@ -2465,6 +2614,7 @@ document.addEventListener('DOMContentLoaded', () => {
       jukeboxQueueList.appendChild(card);
     });
   }
+
 
 
   function createToastContainer() {

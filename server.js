@@ -702,6 +702,19 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        // Collaborative Jukebox: Clear Queue (Host Only)
+        case 'queue_clear': {
+          const room = rooms.get(currentRoomId);
+          if (room && (room.hostWs === ws || msg.isHostOverride)) {
+            room.queue = [];
+            broadcastToRoom(room, {
+              type: 'queue_updated',
+              queue: room.queue
+            });
+          }
+          break;
+        }
+
         // Host: Auto-DJ Crossfade Setting
         case 'set_crossfade': {
           const room = rooms.get(currentRoomId);
@@ -715,25 +728,40 @@ wss.on('connection', (ws) => {
           break;
         }
       }
-
-
-
-    } catch (err) {
-      console.error('WebSocket Error:', err);
+    } catch (e) {
+      console.error('[SyncPulse WS] Message error:', e);
     }
   });
 
   ws.on('close', () => {
-    if (currentRoomId && rooms.has(currentRoomId)) {
+    if (currentRoomId) {
       const room = rooms.get(currentRoomId);
-      room.peers.delete(ws);
-      if (room.hostWs === ws) {
-        room.hostWs = null;
-      }
-      if (room.peers.size === 0) {
-        rooms.delete(currentRoomId);
-      } else {
+      if (room) {
+        room.peers.delete(ws);
+        if (room.hostWs === ws) {
+          room.hostWs = null;
+          // Promote oldest remaining peer to host
+          const remainingPeers = Array.from(room.peers.entries());
+          if (remainingPeers.length > 0) {
+            const [newHostWs, newHostInfo] = remainingPeers[0];
+            room.hostWs = newHostWs;
+            newHostInfo.role = 'host';
+            newHostWs.send(JSON.stringify({
+              type: 'role_promoted',
+              role: 'host'
+            }));
+          }
+        }
         broadcastRoomPeers(room);
+
+        // Clean up empty rooms after 15 mins
+        if (room.peers.size === 0) {
+          setTimeout(() => {
+            if (rooms.get(currentRoomId) && rooms.get(currentRoomId).peers.size === 0) {
+              rooms.delete(currentRoomId);
+            }
+          }, 15 * 60 * 1000);
+        }
       }
     }
   });
@@ -741,8 +769,8 @@ wss.on('connection', (ws) => {
 
 function broadcastToRoom(room, payload, excludeWs = null) {
   const json = JSON.stringify(payload);
-  for (const [clientWs] of room.peers.entries()) {
-    if (clientWs !== excludeWs && clientWs.readyState === WebSocket.OPEN) {
+  for (const clientWs of room.peers.keys()) {
+    if (clientWs !== excludeWs && clientWs.readyState === 1) { // 1 = WebSocket.OPEN
       clientWs.send(json);
     }
   }
@@ -757,7 +785,7 @@ function broadcastRoomPeers(room) {
   });
 }
 
-// Periodic Room Master Sync Pulse (every 2 seconds)
+// Periodic Room Master Sync Pulse (Guest alignment fallback - Host excluded)
 setInterval(() => {
   const nowMs = getServerMasterTime();
   for (const [roomId, room] of rooms.entries()) {
@@ -771,7 +799,7 @@ setInterval(() => {
         position: elapsedSec,
         currentTrack: room.currentTrack,
         serverTime: nowMs
-      });
+      }, room.hostWs); // Exclude Host so host plays purely in real-time without skips
     }
   }
 }, 2000);

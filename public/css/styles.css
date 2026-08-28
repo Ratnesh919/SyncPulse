@@ -488,13 +488,215 @@ body {
   align-items: start;
 }
 
+.studio-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.studio-queue-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-elevated);
+  box-sizing: border-box;
+}
+
+.queue-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.queue-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.queue-count-pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  margin-left: 4px;
+}
+
+.btn-queue-clear-sm {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xs);
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-queue-clear-sm:hover {
+  background: rgba(255, 0, 85, 0.2);
+  border-color: var(--neon-red);
+  color: #fff;
+}
+
+.upcoming-queue-scroll {
+  max-height: 230px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+  box-sizing: border-box;
+}
+
+.upcoming-queue-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.queue-dash-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+}
+
+.queue-dash-card:hover {
+  background: rgba(0, 242, 254, 0.05);
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+.queue-dash-card.rank-1 {
+  border-color: rgba(255, 215, 0, 0.4);
+  background: rgba(255, 215, 0, 0.04);
+}
+
+.queue-dash-rank {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.queue-dash-thumb {
+  width: 44px;
+  height: 30px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.queue-dash-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-dash-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-dash-sub {
+  font-size: 0.64rem;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.queue-dash-vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #ff9900;
+  background: rgba(255, 153, 0, 0.12);
+  border: 1px solid rgba(255, 153, 0, 0.3);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.queue-dash-vote-btn:hover {
+  background: rgba(255, 153, 0, 0.25);
+  transform: scale(1.05);
+}
+
+.queue-dash-play-btn {
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  border-radius: var(--radius-xs);
+  padding: 3px 7px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.queue-dash-play-btn:hover {
+  background: var(--neon-cyan);
+  color: #030509;
+}
+
+.queue-dash-remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: all var(--transition-fast);
+}
+
+.queue-dash-remove-btn:hover {
+  color: var(--neon-red);
+}
+
 @media (max-width: 1024px) {
   .studio-duo-grid {
     grid-template-columns: 1fr;
     gap: 14px;
   }
 }
-
 
 /* Control Console */
 .control-console {

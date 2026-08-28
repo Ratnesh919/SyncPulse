@@ -247,8 +247,11 @@
     <!-- Panel 1: Live Studio, 8D & YouTube -->
     <main id="panel-studio" class="tab-panel active">
       <div class="studio-duo-grid">
-        <!-- Master Studio Console -->
-        <section class="control-console">
+        <!-- Left Column: Master Studio Console + Upcoming Queue Deck -->
+        <div class="studio-col-left">
+          <!-- Master Studio Console -->
+          <section class="control-console">
+
 
           <!-- Top Track Billboard -->
           <div class="track-billboard">
@@ -445,8 +448,31 @@
           </div>
         </section>
 
-        <!-- Column 3: Mini YouTube Search & Sync Desk -->
-        <section class="mini-youtube-panel">
+        <!-- Upcoming Songs Queue List Card (Scrollable) -->
+        <section class="studio-queue-card">
+          <div class="queue-card-header">
+            <div class="queue-card-title">
+              <span class="pulse-beacon" style="background:var(--neon-magenta); width:6px; height:6px;"></span>
+              <span>🗳️ UPCOMING SONGS QUEUE</span>
+              <span id="dashboard-queue-count" class="queue-count-pill">0 Songs</span>
+            </div>
+            <div class="queue-card-actions">
+              <button id="btn-dashboard-queue-clear" class="btn-queue-clear-sm" title="Clear All Queued Songs">Clear</button>
+            </div>
+          </div>
+          
+          <div id="dashboard-queue-scroll" class="upcoming-queue-scroll">
+            <div class="upcoming-queue-empty">
+              <span style="font-size:1.2rem; opacity:0.8;">🎶</span>
+              <span>No upcoming songs in queue. Click <strong>+ Queue</strong> on any YouTube song to add!</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Column 2: Mini YouTube Search & Sync Desk -->
+      <section class="mini-youtube-panel">
+
           <div class="yt-header">
             <div class="yt-badge">
               <svg class="yt-icon-svg" viewBox="0 0 24 24">
