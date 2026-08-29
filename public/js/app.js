@@ -1781,18 +1781,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupYouTubeDesk() {
     function onApiReady() {
-      isYtReady = false;
-      if (currentTrack && currentTrack.type === 'youtube' && currentTrack.youtubeVideoId) {
-        initYouTubePlayer(currentTrack.youtubeVideoId);
-      }
+      // Pre-warm the YouTube iframe in the background so all subsequent song clicks play instantly (<150ms)!
+      const initialId = (currentTrack && currentTrack.type === 'youtube' && currentTrack.youtubeVideoId)
+        ? currentTrack.youtubeVideoId
+        : 'dQw4w9WgXcQ';
+      
+      initYouTubePlayer(initialId, (p) => {
+        // If not playing a YouTube track on start, keep it paused
+        if (!currentTrack || currentTrack.type !== 'youtube') {
+          try {
+            if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
+          } catch (e) {}
+        }
+      });
     }
 
     if (window.YT && window.YT.Player) {
       onApiReady();
     } else {
-      window.onYouTubeIframeAPIReady = onApiReady;
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof prev === 'function') prev();
+        onApiReady();
+      };
     }
-
 
     btnYtSearch.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1929,7 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTrack = track;
     updateTrackUi(currentTrack);
 
-    // Direct User Gesture Thread: Load & play immediately to satisfy autoplay security
+    // Direct User Gesture Thread: Instant video switch without recreating iframe
     if (autoplay) {
       handleYouTubeTrackChange(videoId, true);
     }
@@ -1941,7 +1953,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoplay: autoplay
       }));
     }
-    showToast(`▶ Playing YouTube: ${title}`);
+    showToast(`▶ Playing: ${title}`);
   }
 
   // Bandwidth Saver: Enforces 144p ('tiny') / 240p ('small') lowest resolution stream for low internet usage
@@ -1965,7 +1977,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ytCurrentVideoId = videoId;
 
     if (!window.YT || !window.YT.Player) {
-      setTimeout(() => initYouTubePlayer(videoId, onReady), 200);
+      setTimeout(() => initYouTubePlayer(videoId, onReady), 150);
       return;
     }
 
@@ -2026,9 +2038,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
               e.target.unMute();
               e.target.setVolume(100);
-              e.target.playVideo();
             } catch (err) {}
-            if (typeof onReady === 'function') onReady(e);
+            if (typeof onReady === 'function') onReady(e.target);
           },
           onPlaybackQualityChange: (e) => {
             if (e.data !== 'tiny' && e.data !== 'small') {
@@ -2036,7 +2047,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           },
           onStateChange: (event) => {
-            enforceLowestYouTubeQuality(event.target);
             if (event.data === YT.PlayerState.PLAYING) {
               setPlayButtonState(true);
             } else if (event.data === YT.PlayerState.PAUSED) {
@@ -2071,86 +2081,74 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleYouTubeTrackChange(videoId, autoplay) {
     isCrossfading = false;
     if (!videoId) return;
+    ytCurrentVideoId = videoId;
 
-    if (!ytPlayer || !isYtReady || typeof ytPlayer.loadVideoById !== 'function') {
-      initYouTubePlayer(videoId, () => {
-        enforceLowestYouTubeQuality(ytPlayer);
-        if (autoplay && ytPlayer) {
-          try {
-            ytPlayer.unMute();
-            ytPlayer.setVolume(100);
-            if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
-          } catch (err) {}
-          setPlayButtonState(true);
-        }
-      });
-    } else {
+    // Instant Fast Path: Player is already warm in memory!
+    if (ytPlayer && isYtReady && typeof ytPlayer.loadVideoById === 'function') {
       try {
         ytPlayer.unMute();
         ytPlayer.setVolume(100);
         if (autoplay) {
           ytPlayer.loadVideoById({ videoId, suggestedQuality: 'tiny' });
-          enforceLowestYouTubeQuality(ytPlayer);
           if (typeof ytPlayer.playVideo === 'function') {
             ytPlayer.playVideo();
           }
           setPlayButtonState(true);
         } else {
           ytPlayer.cueVideoById({ videoId, suggestedQuality: 'tiny' });
-          enforceLowestYouTubeQuality(ytPlayer);
         }
+        enforceLowestYouTubeQuality(ytPlayer);
+        return;
       } catch (err) {
-        initYouTubePlayer(videoId, () => {
-          if (autoplay && ytPlayer) {
-            try {
-              ytPlayer.unMute();
-              ytPlayer.setVolume(100);
-              if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
-            } catch (e) {}
-            setPlayButtonState(true);
-          }
-        });
+        console.warn('Fast video load error, re-initializing:', err);
       }
     }
+
+    // Cold boot path
+    initYouTubePlayer(videoId, (player) => {
+      enforceLowestYouTubeQuality(player);
+      if (autoplay && player) {
+        try {
+          player.unMute();
+          player.setVolume(100);
+          if (typeof player.playVideo === 'function') player.playVideo();
+        } catch (err) {}
+        setPlayButtonState(true);
+      }
+    });
   }
 
   function handleYouTubePlayCue(videoId, startPos = 0) {
     if (!videoId) return;
-    if (!ytPlayer || !isYtReady || typeof ytPlayer.playVideo !== 'function') {
-      initYouTubePlayer(videoId, () => {
-        enforceLowestYouTubeQuality(ytPlayer);
-        if (ytPlayer) {
-          try {
-            ytPlayer.unMute();
-            ytPlayer.setVolume(100);
-            if (startPos > 0 && typeof ytPlayer.seekTo === 'function') ytPlayer.seekTo(startPos, true);
-            if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
-          } catch (e) {}
-          setPlayButtonState(true);
-        }
-      });
-    } else {
+    ytCurrentVideoId = videoId;
+
+    if (ytPlayer && isYtReady && typeof ytPlayer.playVideo === 'function') {
       try {
         ytPlayer.unMute();
         ytPlayer.setVolume(100);
-        if (startPos > 0 && typeof ytPlayer.seekTo === 'function') ytPlayer.seekTo(startPos, true);
-        if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+        if (typeof ytPlayer.loadVideoById === 'function') {
+          ytPlayer.loadVideoById({ videoId, startSeconds: startPos, suggestedQuality: 'tiny' });
+        } else {
+          if (startPos > 0 && typeof ytPlayer.seekTo === 'function') ytPlayer.seekTo(startPos, true);
+          ytPlayer.playVideo();
+        }
         enforceLowestYouTubeQuality(ytPlayer);
         setPlayButtonState(true);
-      } catch (err) {
-        initYouTubePlayer(videoId, () => {
-          if (ytPlayer) {
-            try {
-              ytPlayer.unMute();
-              ytPlayer.setVolume(100);
-              if (startPos > 0 && typeof ytPlayer.seekTo === 'function') ytPlayer.seekTo(startPos, true);
-              if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
-            } catch (e) {}
-          }
-          setPlayButtonState(true);
-        });
-      }
+        return;
+      } catch (err) {}
     }
+
+    initYouTubePlayer(videoId, (player) => {
+      if (player) {
+        try {
+          player.unMute();
+          player.setVolume(100);
+          if (startPos > 0 && typeof player.seekTo === 'function') player.seekTo(startPos, true);
+          if (typeof player.playVideo === 'function') player.playVideo();
+        } catch (e) {}
+        setPlayButtonState(true);
+      }
+    });
   }
 
 

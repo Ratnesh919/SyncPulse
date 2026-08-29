@@ -281,7 +281,7 @@ wss.on('connection', (ws) => {
         case 'play_cue': {
           const room = rooms.get(currentRoomId);
           if (room && isHostSender(room, ws, msg)) {
-            const leadTime = msg.leadTime || 800;
+            const leadTime = (msg.sourceType === 'youtube') ? 80 : Math.min(msg.leadTime || 150, 250);
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime - ((msg.position || 0) * 1000);
 
@@ -333,7 +333,7 @@ wss.on('connection', (ws) => {
         case 'seek_cue': {
           const room = rooms.get(currentRoomId);
           if (room && isHostSender(room, ws, msg)) {
-            const leadTime = Math.min(msg.leadTime || 250, 300);
+            const leadTime = (msg.sourceType === 'youtube') ? 50 : Math.min(msg.leadTime || 100, 200);
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime - (msg.position * 1000);
             room.playbackState.position = msg.position;
@@ -403,7 +403,7 @@ wss.on('connection', (ws) => {
             room.playbackState.sourceType = msg.track.type || 'youtube';
             room.playbackState.youtubeVideoId = msg.track.youtubeVideoId || null;
 
-            const leadTime = 400; // fast 400ms lead time
+            const leadTime = (msg.track && msg.track.type === 'youtube') ? 80 : 200;
             const targetMasterTime = getServerMasterTime() + leadTime;
             const roomMasterStartTime = targetMasterTime;
             room.playbackState.targetMasterTime = targetMasterTime;
