@@ -704,6 +704,9 @@ class AudioEngine {
       if (this.currentSource === source) {
         this.isPlaying = false;
         this.currentSource = null;
+        if (typeof this.onTrackEnded === 'function') {
+          this.onTrackEnded();
+        }
       }
     };
   }

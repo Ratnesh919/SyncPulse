@@ -211,6 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let crossfadeDuration = 4; // seconds (0 = off)
   let isCrossfading = false;
 
+  // Smart Auto-Play & History Tracking (Prevents duplicate song replays)
+  let sessionPlayedHistory = new Set();
+  let isAutoPlayActive = true; // Auto-play enabled by default
+  let isFetchingAutoRecommendation = false;
+
   // YouTube Player State
   let ytPlayer = null;
   let isYtReady = false;
@@ -238,6 +243,27 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCrossfadeControls();
     setupRadioStations();
     setupJukeboxQueue();
+    setupAutoPlayControls();
+
+    if (audioEngine) {
+      audioEngine.onTrackEnded = () => {
+        setPlayButtonState(false);
+        isCrossfading = false;
+        if (myRole === 'host') {
+          if (currentQueue && currentQueue.length > 0) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'queue_pop_next',
+                crossfadeSec: crossfadeDuration,
+                isAutoTransition: true
+              }));
+            }
+          } else if (isAutoPlayActive) {
+            playSmartAutoRecommendedTrack(currentTrack);
+          }
+        }
+      };
+    }
 
     
     // Parse URL room code
@@ -874,6 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isCrossfading = false;
         currentTrack = msg.track || currentTrack;
         if (!currentTrack) break;
+        recordTrackInSessionHistory(currentTrack);
         if (msg.roomMasterStartTime) {
           audioEngine.setRoomMasterStartTime(msg.roomMasterStartTime);
         }
@@ -1972,6 +1999,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     currentTrack = track;
+    recordTrackInSessionHistory(currentTrack);
     updateTrackUi(currentTrack);
 
     // Direct User Gesture Thread: Instant video switch without recreating iframe
@@ -2096,6 +2124,8 @@ document.addEventListener('DOMContentLoaded', () => {
                       isAutoTransition: true
                     }));
                   }
+                } else if (isAutoPlayActive) {
+                  playSmartAutoRecommendedTrack(currentTrack);
                 }
               }
             }
@@ -2324,16 +2354,20 @@ document.addEventListener('DOMContentLoaded', () => {
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
 
-      // Auto-DJ Transition Trigger: When reaching end of track, blend next queued song
-      if (myRole === 'host' && crossfadeDuration > 0 && currentQueue.length > 0 && !isCrossfading) {
+      // Auto-DJ Transition Trigger: When reaching end of track, blend next queued song OR auto-recommend next song!
+      if (myRole === 'host' && crossfadeDuration > 0 && !isCrossfading) {
         if (dur > (crossfadeDuration + 4) && pos >= (dur - crossfadeDuration)) {
           isCrossfading = true;
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'queue_pop_next',
-              crossfadeSec: crossfadeDuration,
-              isAutoTransition: true
-            }));
+          if (currentQueue && currentQueue.length > 0) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'queue_pop_next',
+                crossfadeSec: crossfadeDuration,
+                isAutoTransition: true
+              }));
+            }
+          } else if (isAutoPlayActive) {
+            playSmartAutoRecommendedTrack(currentTrack);
           }
         }
       }
@@ -2345,15 +2379,19 @@ document.addEventListener('DOMContentLoaded', () => {
       timeCurrent.textContent = formatTime(pos);
       timeTotal.textContent = formatTime(dur);
 
-      if (myRole === 'host' && crossfadeDuration > 0 && currentQueue.length > 0 && !isCrossfading) {
+      if (myRole === 'host' && crossfadeDuration > 0 && !isCrossfading) {
         if (dur > (crossfadeDuration + 4) && pos >= (dur - crossfadeDuration)) {
           isCrossfading = true;
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'queue_pop_next',
-              crossfadeSec: crossfadeDuration,
-              isAutoTransition: true
-            }));
+          if (currentQueue && currentQueue.length > 0) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'queue_pop_next',
+                crossfadeSec: crossfadeDuration,
+                isAutoTransition: true
+              }));
+            }
+          } else if (isAutoPlayActive) {
+            playSmartAutoRecommendedTrack(currentTrack);
           }
         }
       }
@@ -2775,6 +2813,193 @@ document.addEventListener('DOMContentLoaded', () => {
           runJukeboxSearch();
         }
       });
+    }
+  }
+
+  function setupAutoPlayControls() {
+    const toggleAutoplay = document.getElementById('toggle-autoplay');
+    const autoplayLabelText = document.getElementById('autoplay-label-text');
+    if (toggleAutoplay) {
+      toggleAutoplay.addEventListener('change', () => {
+        isAutoPlayActive = toggleAutoplay.checked;
+        const pill = toggleAutoplay.closest('.autoplay-toggle-pill');
+        if (pill) {
+          pill.classList.toggle('off', !isAutoPlayActive);
+        }
+        if (autoplayLabelText) {
+          autoplayLabelText.textContent = isAutoPlayActive ? '✨ Auto-Play: ON' : '✨ Auto-Play: OFF';
+        }
+        showToast(isAutoPlayActive ? '✨ Auto-Play: ENABLED (Infinite Related Songs)' : '✨ Auto-Play: DISABLED');
+      });
+    }
+  }
+
+  function recordTrackInSessionHistory(track) {
+    if (!track) return;
+    if (track.id) sessionPlayedHistory.add(String(track.id));
+    if (track.youtubeVideoId) sessionPlayedHistory.add(String(track.youtubeVideoId));
+    if (track.title) sessionPlayedHistory.add(track.title.toLowerCase().trim());
+  }
+
+  async function playSmartAutoRecommendedTrack(lastTrack) {
+    if (myRole !== 'host' || !isAutoPlayActive || isFetchingAutoRecommendation) return;
+    isFetchingAutoRecommendation = true;
+
+    try {
+      if (!lastTrack) {
+        if (tracks && tracks.length > 0) {
+          const unplayed = tracks.filter(t => !sessionPlayedHistory.has(String(t.id)) && !sessionPlayedHistory.has(t.title.toLowerCase().trim()));
+          const candidatePool = unplayed.length > 0 ? unplayed : tracks;
+          const chosen = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          broadcastAutoTrack(chosen);
+        }
+        return;
+      }
+
+      // If last track was YouTube:
+      if (lastTrack.type === 'youtube' || lastTrack.youtubeVideoId) {
+        const rawTitle = lastTrack.title || '';
+        const rawArtist = lastTrack.artist || '';
+
+        // Clean title & artist of common tags
+        const cleanTitle = rawTitle
+          .replace(/\(Official.*?\)/gi, '')
+          .replace(/\[Official.*?\]/gi, '')
+          .replace(/\(Audio.*?\)/gi, '')
+          .replace(/\(Lyric.*?\)/gi, '')
+          .replace(/\(Video.*?\)/gi, '')
+          .replace(/4K|HD|1080p|MV|HQ/gi, '')
+          .replace(/feat\..*|ft\..*/gi, '')
+          .trim();
+
+        const cleanArtist = rawArtist
+          .replace(/VEVO|Topic|Official|Channel/gi, '')
+          .replace(/ - Topic/gi, '')
+          .trim();
+
+        let detectedMood = 'chill';
+        if (atmosphereEngine && typeof atmosphereEngine.detectThemeAndMood === 'function') {
+          const moodInfo = atmosphereEngine.detectThemeAndMood(cleanTitle, cleanArtist);
+          detectedMood = moodInfo.keyword || moodInfo.theme || 'chill';
+        }
+
+        // Varied smart queries cascade to discover related unplayed songs
+        const queries = [
+          cleanArtist ? `${cleanArtist} songs` : `${cleanTitle} radio`,
+          cleanArtist ? `${cleanArtist} top hits mix` : `${cleanTitle} similar songs`,
+          `${cleanTitle} radio playlist`,
+          `${detectedMood} vibe music songs playlist`
+        ];
+
+        let foundCandidate = null;
+        for (const q of queries) {
+          try {
+            const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data && data.results && data.results.length > 0) {
+              const unplayedResults = data.results.filter(v => {
+                const vid = String(v.id);
+                const vtitle = (v.title || '').toLowerCase().trim();
+                return !sessionPlayedHistory.has(vid) && !sessionPlayedHistory.has(vtitle) && vid !== lastTrack.youtubeVideoId;
+              });
+
+              if (unplayedResults.length > 0) {
+                // Select a random candidate from top unplayed matches for natural radio discovery
+                const poolSize = Math.min(6, unplayedResults.length);
+                const picked = unplayedResults[Math.floor(Math.random() * poolSize)];
+
+                let durationSec = 210;
+                if (picked.duration && picked.duration.includes(':')) {
+                  const parts = picked.duration.split(':').map(Number);
+                  if (parts.length === 2) durationSec = parts[0] * 60 + parts[1];
+                  else if (parts.length === 3) durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                }
+
+                foundCandidate = {
+                  id: `yt_${picked.id}`,
+                  title: picked.title,
+                  artist: picked.channel || cleanArtist || 'YouTube Music',
+                  duration: durationSec,
+                  type: 'youtube',
+                  youtubeVideoId: picked.id,
+                  albumArt: picked.thumbnail,
+                  genre: detectedMood
+                };
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn('Auto recommendation query error:', e);
+          }
+        }
+
+        if (foundCandidate) {
+          showToast(`📻 Auto-Play: Playing "${foundCandidate.title.substring(0, 28)}..." (Related to ${cleanArtist || cleanTitle})`);
+          broadcastAutoTrack(foundCandidate);
+          return;
+        }
+      }
+
+      // If library track or YouTube search fallback:
+      if (tracks && tracks.length > 0) {
+        const sameArtist = tracks.filter(t => 
+          t.artist && lastTrack.artist && 
+          t.artist.toLowerCase() === lastTrack.artist.toLowerCase() &&
+          !sessionPlayedHistory.has(String(t.id))
+        );
+
+        const sameGenre = tracks.filter(t =>
+          t.genre && lastTrack.genre &&
+          t.genre.toLowerCase() === lastTrack.genre.toLowerCase() &&
+          !sessionPlayedHistory.has(String(t.id))
+        );
+
+        const unplayedAll = tracks.filter(t => !sessionPlayedHistory.has(String(t.id)));
+
+        let pool = sameArtist.length > 0 ? sameArtist : (sameGenre.length > 0 ? sameGenre : unplayedAll);
+        if (pool.length === 0) {
+          sessionPlayedHistory.clear();
+          if (lastTrack.id) sessionPlayedHistory.add(String(lastTrack.id));
+          pool = tracks.filter(t => t.id !== lastTrack.id);
+        }
+
+        const chosen = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : tracks[0];
+        if (chosen) {
+          showToast(`📻 Auto-Play: Playing "${chosen.title}" by ${chosen.artist}`);
+          broadcastAutoTrack(chosen);
+          return;
+        }
+      }
+    } finally {
+      setTimeout(() => {
+        isFetchingAutoRecommendation = false;
+      }, 1500);
+    }
+  }
+
+  function broadcastAutoTrack(track) {
+    if (!track) return;
+    currentTrack = track;
+    recordTrackInSessionHistory(currentTrack);
+    updateTrackUi(currentTrack);
+
+    if (currentTrack.type === 'youtube' && currentTrack.youtubeVideoId) {
+      handleYouTubeTrackChange(currentTrack.youtubeVideoId, true);
+    } else if (currentTrack.url && audioEngine.ctx) {
+      audioEngine.loadTrack(currentTrack.url).then(() => {
+        audioEngine.play();
+        setPlayButtonState(true);
+      });
+    }
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'change_track',
+        track: currentTrack,
+        autoplay: true,
+        isAutoTransition: true,
+        crossfadeSec: crossfadeDuration
+      }));
     }
   }
 

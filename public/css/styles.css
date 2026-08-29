@@ -583,6 +583,48 @@ body {
   margin-left: 4px;
 }
 
+.autoplay-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.autoplay-toggle-pill:hover {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--neon-cyan);
+}
+
+.autoplay-toggle-pill input[type="checkbox"] {
+  accent-color: var(--neon-cyan);
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+}
+
+.autoplay-label-text {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--neon-cyan);
+  white-space: nowrap;
+}
+
+.autoplay-toggle-pill.off {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.autoplay-toggle-pill.off .autoplay-label-text {
+  color: var(--text-tertiary);
+}
+
 .btn-queue-clear-sm {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-medium);
