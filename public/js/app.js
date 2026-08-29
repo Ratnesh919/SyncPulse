@@ -1182,36 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await audioEngine.init();
       if (!currentTrack) return;
 
-      if (audioEngine.isStreamPlaying || (currentTrack.type === 'youtube' && audioEngine.mediaAudioElement && !audioEngine.mediaAudioElement.paused)) {
-        const pos = audioEngine.getCurrentPlaybackPosition();
-        audioEngine.pause(pos);
-        setPlayButtonState(false);
-        ws.send(JSON.stringify({
-          type: 'pause_cue',
-          position: pos,
-          sourceType: 'youtube'
-        }));
-        return;
-      }
-
       if (currentTrack.type === 'youtube') {
-        if (audioEngine.mediaAudioElement && audioEngine.mediaAudioElement.src) {
-          audioEngine.mediaAudioElement.play().then(() => {
-            audioEngine.isPlaying = true;
-            audioEngine.isStreamPlaying = true;
-            setPlayButtonState(true);
-          }).catch(() => {});
-          const pos = audioEngine.getCurrentPlaybackPosition();
-          ws.send(JSON.stringify({
-            type: 'play_cue',
-            sourceType: 'youtube',
-            youtubeVideoId: currentTrack.youtubeVideoId,
-            position: pos,
-            leadTime: 80
-          }));
-          return;
-        }
-
         const isYtPlaying = ytPlayer && typeof ytPlayer.getPlayerState === 'function' && ytPlayer.getPlayerState() === 1;
         if (isYtPlaying) {
           const ytPos = (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0;
@@ -2140,22 +2111,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function handleYouTubeTrackChange(videoId, autoplay) {
+  function handleYouTubeTrackChange(videoId, autoplay) {
     isCrossfading = false;
     if (!videoId) return;
     ytCurrentVideoId = videoId;
 
-    // 1. Direct WebAudio Stream Proxy (Routes 100% through 10-Band EQ, 360° Real Space Binaural HRTF, 8D Orbit, and Dolby 5.1/7.1 Fleet!)
-    try {
-      const streamEndpoint = `/api/youtube/stream/${videoId}`;
-      await audioEngine.loadAndPlayStream(streamEndpoint, 0, autoplay);
-      setPlayButtonState(autoplay);
-      return;
-    } catch (err) {
-      console.warn('WebAudio stream proxy fallback to iframe:', err);
-    }
-
-    // 2. Fallback to IFrame Player if stream proxy is unavailable
+    // Direct fast path on active YouTube player
     if (ytPlayer && isYtReady && typeof ytPlayer.loadVideoById === 'function') {
       try {
         ytPlayer.unMute();
@@ -2190,17 +2151,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function handleYouTubePlayCue(videoId, startPos = 0) {
+  function handleYouTubePlayCue(videoId, startPos = 0) {
     if (!videoId) return;
     ytCurrentVideoId = videoId;
-
-    // 1. Direct WebAudio Stream Proxy
-    try {
-      const streamEndpoint = `/api/youtube/stream/${videoId}`;
-      await audioEngine.loadAndPlayStream(streamEndpoint, startPos, true);
-      setPlayButtonState(true);
-      return;
-    } catch (err) {}
 
     if (ytPlayer && isYtReady && typeof ytPlayer.playVideo === 'function') {
       try {

@@ -195,41 +195,33 @@ class AtmosphereEngine {
   initRealisticClouds(isDay) {
     // 1. Deep Background Clouds (Drifting behind cards on underlay canvas)
     this.bgClouds = [
-      this.createRealisticCloud(this.width * -0.08, this.height * 0.10, 1.35, 0.16, isDay ? 0.90 : 0.72, false),
-      this.createRealisticCloud(this.width * 0.38, this.height * 0.20, 1.55, 0.11, isDay ? 0.86 : 0.65, false),
-      this.createRealisticCloud(this.width * 0.78, this.height * 0.05, 1.15, 0.20, isDay ? 0.78 : 0.58, false)
+      this.createRealisticCloud(this.width * -0.08, this.height * 0.10, 1.35, 0.14, isDay ? 0.90 : 0.75, isDay, false),
+      this.createRealisticCloud(this.width * 0.38, this.height * 0.20, 1.55, 0.10, isDay ? 0.86 : 0.68, isDay, false),
+      this.createRealisticCloud(this.width * 0.78, this.height * 0.05, 1.15, 0.18, isDay ? 0.78 : 0.60, isDay, false)
     ];
 
     // 2. Foreground Wispy Clouds (Drifting ABOVE & ACROSS the cards on overlay canvas)
     this.fgClouds = [
-      this.createRealisticCloud(this.width * 0.15, this.height * 0.03, 1.05, 0.24, isDay ? 0.36 : 0.28, true),
-      this.createRealisticCloud(this.width * 0.62, this.height * 0.14, 1.25, 0.18, isDay ? 0.30 : 0.22, true)
+      this.createRealisticCloud(this.width * 0.15, this.height * 0.03, 1.05, 0.22, isDay ? 0.36 : 0.28, isDay, true),
+      this.createRealisticCloud(this.width * 0.62, this.height * 0.14, 1.25, 0.16, isDay ? 0.30 : 0.22, isDay, true)
     ];
   }
 
-  createRealisticCloud(x, y, scale, speed, baseAlpha, isForeground) {
-    // 18 feathered volumetric billows for true organic cloud massing with zero hard edges
+  createCloudSprite(scale, isDay, isForeground) {
     const puffs = [
-      // Base anchoring billows
       { dx: -70, dy: 16, r: 56 },
       { dx: -24, dy: 20, r: 68 },
       { dx: 28, dy: 18, r: 72 },
       { dx: 82, dy: 14, r: 62 },
       { dx: 130, dy: 16, r: 52 },
-
-      // Central dense volumetric body
       { dx: -48, dy: 0, r: 64 },
       { dx: 0, dy: -6, r: 80 },
       { dx: 48, dy: -2, r: 74 },
       { dx: 96, dy: 2, r: 60 },
-
-      // Towering crest billows
       { dx: -28, dy: -28, r: 54 },
       { dx: 18, dy: -38, r: 64 },
       { dx: 60, dy: -26, r: 50 },
       { dx: -66, dy: -14, r: 44 },
-
-      // Wispy trailing and leading edge puffs
       { dx: -105, dy: 10, r: 38 },
       { dx: -128, dy: 14, r: 28 },
       { dx: 154, dy: 12, r: 40 },
@@ -237,6 +229,71 @@ class AtmosphereEngine {
       { dx: 198, dy: 18, r: 22 }
     ];
 
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const spriteWidth = Math.ceil(520 * scale);
+    const spriteHeight = Math.ceil(260 * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, spriteWidth * dpr);
+    canvas.height = Math.max(1, spriteHeight * dpr);
+    const cCtx = canvas.getContext('2d');
+    cCtx.scale(dpr, dpr);
+
+    const originX = 180 * scale;
+    const originY = 120 * scale;
+
+    for (let i = 0; i < puffs.length; i++) {
+      const puff = puffs[i];
+      const px = originX + puff.dx * scale;
+      const py = originY + puff.dy * scale;
+      const pr = puff.r * scale;
+
+      const lx = px - pr * 0.20;
+      const ly = py - pr * 0.25;
+      const outerRadius = pr * 1.75;
+
+      const grad = cCtx.createRadialGradient(lx, ly, 0, px, py, outerRadius);
+
+      if (isDay) {
+        if (!isForeground) {
+          grad.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
+          grad.addColorStop(0.25, 'rgba(255, 253, 244, 0.82)');
+          grad.addColorStop(0.55, 'rgba(228, 240, 252, 0.42)');
+          grad.addColorStop(0.80, 'rgba(208, 228, 248, 0.15)');
+          grad.addColorStop(1, 'rgba(195, 220, 245, 0)');
+        } else {
+          grad.addColorStop(0, 'rgba(255, 255, 255, 0.65)');
+          grad.addColorStop(0.30, 'rgba(255, 252, 246, 0.45)');
+          grad.addColorStop(0.65, 'rgba(232, 244, 255, 0.18)');
+          grad.addColorStop(1, 'rgba(215, 235, 255, 0)');
+        }
+      } else {
+        if (!isForeground) {
+          // Night moonlight background clouds
+          grad.addColorStop(0, 'rgba(240, 249, 255, 0.85)');
+          grad.addColorStop(0.28, 'rgba(195, 225, 255, 0.58)');
+          grad.addColorStop(0.60, 'rgba(138, 182, 230, 0.25)');
+          grad.addColorStop(0.85, 'rgba(92, 142, 202, 0.08)');
+          grad.addColorStop(1, 'rgba(65, 105, 165, 0)');
+        } else {
+          // Night moonlight wispy foreground clouds
+          grad.addColorStop(0, 'rgba(228, 246, 255, 0.55)');
+          grad.addColorStop(0.35, 'rgba(175, 218, 252, 0.30)');
+          grad.addColorStop(0.72, 'rgba(122, 172, 230, 0.10)');
+          grad.addColorStop(1, 'rgba(75, 125, 185, 0)');
+        }
+      }
+
+      cCtx.fillStyle = grad;
+      cCtx.beginPath();
+      cCtx.arc(px, py, outerRadius, 0, Math.PI * 2);
+      cCtx.fill();
+    }
+
+    return { canvas, width: spriteWidth, height: spriteHeight, originX, originY };
+  }
+
+  createRealisticCloud(x, y, scale, speed, baseAlpha, isDay, isForeground) {
+    const sprite = this.createCloudSprite(scale, isDay, isForeground);
     return {
       x,
       y,
@@ -245,7 +302,7 @@ class AtmosphereEngine {
       speed,
       baseAlpha,
       isForeground,
-      puffs,
+      sprite,
       wobblePhase: Math.random() * Math.PI * 2,
       wobbleSpeed: 0.0003 + Math.random() * 0.0003
     };
@@ -256,19 +313,18 @@ class AtmosphereEngine {
 
     for (let c = 0; c < clouds.length; c++) {
       const cloud = clouds[c];
-      // Steady, realistic horizontal breeze drift (no stutter, no jumping)
+      // Steady, continuous breeze drift across screen
       cloud.x += cloud.speed;
 
-      // Gentle, soothing vertical breeze floating undulation
+      // Gentle, soothing vertical breeze floating wave
       const breezeY = cloud.baseY + Math.sin(time * 0.00035 + cloud.wobblePhase) * 8 + Math.cos(time * 0.00065 + cloud.wobblePhase * 1.5) * 4;
 
-      // Seamless viewport wrapping
-      const totalWidth = 480 * cloud.scale;
+      const totalWidth = cloud.sprite ? cloud.sprite.width : (480 * cloud.scale);
       if (cloud.x > this.width + totalWidth) {
         cloud.x = -totalWidth;
       }
 
-      // Smooth edge fade: clouds softly materialize from the left and dissolve at the right
+      // Smooth edge fade: clouds softly materialize from left and dissolve at right
       let edgeFade = 1.0;
       const fadeMargin = 220 * cloud.scale;
       if (cloud.x < 0) {
@@ -278,58 +334,18 @@ class AtmosphereEngine {
       }
 
       const effAlpha = cloud.baseAlpha * edgeFade;
-      if (effAlpha <= 0.001) continue;
+      if (effAlpha <= 0.001 || !cloud.sprite) continue;
 
-      for (let i = 0; i < cloud.puffs.length; i++) {
-        const puff = cloud.puffs[i];
-        const px = cloud.x + puff.dx * cloud.scale;
-        const py = breezeY + puff.dy * cloud.scale;
-        const pr = puff.r * cloud.scale;
-
-        // Light source direction
-        const lx = px - pr * 0.22;
-        const ly = py - pr * 0.26;
-        const outerRadius = pr * 1.85;
-
-        const grad = ctx.createRadialGradient(lx, ly, pr * 0.04, px, py, outerRadius);
-
-        if (isDay) {
-          if (!isForeground) {
-            // Background deep sunlit clouds
-            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.95})`);
-            grad.addColorStop(0.25, `rgba(255, 253, 244, ${effAlpha * 0.85})`);
-            grad.addColorStop(0.55, `rgba(228, 240, 252, ${effAlpha * 0.45})`);
-            grad.addColorStop(0.80, `rgba(208, 228, 248, ${effAlpha * 0.15})`);
-            grad.addColorStop(1, 'rgba(195, 220, 245, 0)');
-          } else {
-            // Foreground wispy clouds above cards
-            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.70})`);
-            grad.addColorStop(0.30, `rgba(255, 252, 246, ${effAlpha * 0.50})`);
-            grad.addColorStop(0.65, `rgba(232, 244, 255, ${effAlpha * 0.20})`);
-            grad.addColorStop(1, 'rgba(215, 235, 255, 0)');
-          }
-        } else {
-          if (!isForeground) {
-            // Background moonlit night clouds with soft silvery highlights
-            grad.addColorStop(0, `rgba(240, 249, 255, ${effAlpha * 0.82})`);
-            grad.addColorStop(0.28, `rgba(195, 225, 255, ${effAlpha * 0.55})`);
-            grad.addColorStop(0.60, `rgba(138, 182, 230, ${effAlpha * 0.24})`);
-            grad.addColorStop(0.85, `rgba(92, 142, 202, ${effAlpha * 0.08})`);
-            grad.addColorStop(1, 'rgba(65, 105, 165, 0)');
-          } else {
-            // Foreground wispy moon clouds with ethereal transparency
-            grad.addColorStop(0, `rgba(228, 246, 255, ${effAlpha * 0.55})`);
-            grad.addColorStop(0.35, `rgba(175, 218, 252, ${effAlpha * 0.30})`);
-            grad.addColorStop(0.72, `rgba(122, 172, 230, ${effAlpha * 0.10})`);
-            grad.addColorStop(1, 'rgba(75, 125, 185, 0)');
-          }
-        }
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(px, py, outerRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.save();
+      ctx.globalAlpha = effAlpha;
+      ctx.drawImage(
+        cloud.sprite.canvas,
+        cloud.x - cloud.sprite.originX,
+        breezeY - cloud.sprite.originY,
+        cloud.sprite.width,
+        cloud.sprite.height
+      );
+      ctx.restore();
     }
   }
 
