@@ -195,119 +195,139 @@ class AtmosphereEngine {
   initRealisticClouds(isDay) {
     // 1. Deep Background Clouds (Drifting behind cards on underlay canvas)
     this.bgClouds = [
-      this.createRealisticCloud(this.width * 0.05, this.height * 0.12, 1.25, 0.18, isDay ? 0.92 : 0.75, false),
-      this.createRealisticCloud(this.width * 0.55, this.height * 0.22, 1.45, 0.12, isDay ? 0.88 : 0.65, false),
-      this.createRealisticCloud(this.width * 0.32, this.height * 0.06, 1.05, 0.22, isDay ? 0.78 : 0.55, false)
+      this.createRealisticCloud(this.width * -0.08, this.height * 0.10, 1.35, 0.16, isDay ? 0.90 : 0.72, false),
+      this.createRealisticCloud(this.width * 0.38, this.height * 0.20, 1.55, 0.11, isDay ? 0.86 : 0.65, false),
+      this.createRealisticCloud(this.width * 0.78, this.height * 0.05, 1.15, 0.20, isDay ? 0.78 : 0.58, false)
     ];
 
     // 2. Foreground Wispy Clouds (Drifting ABOVE & ACROSS the cards on overlay canvas)
     this.fgClouds = [
-      this.createRealisticCloud(this.width * 0.18, this.height * 0.05, 0.95, 0.26, isDay ? 0.36 : 0.26, true),
-      this.createRealisticCloud(this.width * 0.68, this.height * 0.16, 1.15, 0.15, isDay ? 0.30 : 0.22, true)
+      this.createRealisticCloud(this.width * 0.15, this.height * 0.03, 1.05, 0.24, isDay ? 0.36 : 0.28, true),
+      this.createRealisticCloud(this.width * 0.62, this.height * 0.14, 1.25, 0.18, isDay ? 0.30 : 0.22, true)
     ];
   }
 
   createRealisticCloud(x, y, scale, speed, baseAlpha, isForeground) {
-    // 16 overlapping feathered billows creating organic cumulus structure with zero hard circular outlines
+    // 18 feathered volumetric billows for true organic cloud massing with zero hard edges
     const puffs = [
-      // Base flat anchoring billows
-      { dx: -65, dy: 16, r: 52 },
-      { dx: -22, dy: 20, r: 64 },
-      { dx: 26, dy: 18, r: 68 },
-      { dx: 78, dy: 14, r: 58 },
-      { dx: 122, dy: 16, r: 48 },
+      // Base anchoring billows
+      { dx: -70, dy: 16, r: 56 },
+      { dx: -24, dy: 20, r: 68 },
+      { dx: 28, dy: 18, r: 72 },
+      { dx: 82, dy: 14, r: 62 },
+      { dx: 130, dy: 16, r: 52 },
 
       // Central dense volumetric body
-      { dx: -45, dy: 0, r: 60 },
-      { dx: 0, dy: -6, r: 76 },
-      { dx: 46, dy: -2, r: 70 },
-      { dx: 92, dy: 2, r: 56 },
+      { dx: -48, dy: 0, r: 64 },
+      { dx: 0, dy: -6, r: 80 },
+      { dx: 48, dy: -2, r: 74 },
+      { dx: 96, dy: 2, r: 60 },
 
-      // Towering sunlit / moonlit crest billows
-      { dx: -25, dy: -26, r: 50 },
-      { dx: 16, dy: -36, r: 60 },
-      { dx: 56, dy: -24, r: 46 },
-      { dx: -62, dy: -12, r: 40 },
+      // Towering crest billows
+      { dx: -28, dy: -28, r: 54 },
+      { dx: 18, dy: -38, r: 64 },
+      { dx: 60, dy: -26, r: 50 },
+      { dx: -66, dy: -14, r: 44 },
 
-      // Wispy trailing edge puffs
-      { dx: -98, dy: 10, r: 34 },
-      { dx: 146, dy: 12, r: 36 },
-      { dx: 168, dy: 16, r: 26 }
+      // Wispy trailing and leading edge puffs
+      { dx: -105, dy: 10, r: 38 },
+      { dx: -128, dy: 14, r: 28 },
+      { dx: 154, dy: 12, r: 40 },
+      { dx: 178, dy: 16, r: 30 },
+      { dx: 198, dy: 18, r: 22 }
     ];
 
     return {
       x,
       y,
+      baseY: y,
       scale,
       speed,
       baseAlpha,
       isForeground,
-      puffs
+      puffs,
+      wobblePhase: Math.random() * Math.PI * 2,
+      wobbleSpeed: 0.0003 + Math.random() * 0.0003
     };
   }
 
-  drawRealisticClouds(ctx, clouds, isDay, bassEnergy, isForeground) {
+  drawRealisticClouds(ctx, clouds, isDay, isForeground, time) {
     if (!clouds || !ctx) return;
 
     for (let c = 0; c < clouds.length; c++) {
       const cloud = clouds[c];
+      // Steady, realistic horizontal breeze drift (no stutter, no jumping)
       cloud.x += cloud.speed;
 
-      // Wrap smoothly around viewport
-      const totalWidth = 400 * cloud.scale;
+      // Gentle, soothing vertical breeze floating undulation
+      const breezeY = cloud.baseY + Math.sin(time * 0.00035 + cloud.wobblePhase) * 8 + Math.cos(time * 0.00065 + cloud.wobblePhase * 1.5) * 4;
+
+      // Seamless viewport wrapping
+      const totalWidth = 480 * cloud.scale;
       if (cloud.x > this.width + totalWidth) {
         cloud.x = -totalWidth;
       }
 
-      const effAlpha = cloud.baseAlpha * (0.88 + bassEnergy * 0.12);
+      // Smooth edge fade: clouds softly materialize from the left and dissolve at the right
+      let edgeFade = 1.0;
+      const fadeMargin = 220 * cloud.scale;
+      if (cloud.x < 0) {
+        edgeFade = Math.max(0, (cloud.x + totalWidth) / totalWidth);
+      } else if (cloud.x > this.width - fadeMargin) {
+        edgeFade = Math.max(0, ((this.width + totalWidth) - cloud.x) / (totalWidth + fadeMargin));
+      }
+
+      const effAlpha = cloud.baseAlpha * edgeFade;
+      if (effAlpha <= 0.001) continue;
 
       for (let i = 0; i < cloud.puffs.length; i++) {
         const puff = cloud.puffs[i];
         const px = cloud.x + puff.dx * cloud.scale;
-        const py = cloud.y + puff.dy * cloud.scale;
-        const pr = puff.r * cloud.scale * (1 + bassEnergy * 0.04);
+        const py = breezeY + puff.dy * cloud.scale;
+        const pr = puff.r * cloud.scale;
 
-        // Light direction (Top right / sun / moon position)
+        // Light source direction
         const lx = px - pr * 0.22;
-        const ly = py - pr * 0.28;
+        const ly = py - pr * 0.26;
+        const outerRadius = pr * 1.85;
 
-        const grad = ctx.createRadialGradient(lx, ly, pr * 0.05, px, py, pr);
+        const grad = ctx.createRadialGradient(lx, ly, pr * 0.04, px, py, outerRadius);
 
         if (isDay) {
           if (!isForeground) {
             // Background deep sunlit clouds
             grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.95})`);
-            grad.addColorStop(0.28, `rgba(255, 253, 242, ${effAlpha * 0.85})`);
-            grad.addColorStop(0.62, `rgba(225, 238, 252, ${effAlpha * 0.45})`);
-            grad.addColorStop(0.88, `rgba(205, 226, 248, ${effAlpha * 0.15})`);
+            grad.addColorStop(0.25, `rgba(255, 253, 244, ${effAlpha * 0.85})`);
+            grad.addColorStop(0.55, `rgba(228, 240, 252, ${effAlpha * 0.45})`);
+            grad.addColorStop(0.80, `rgba(208, 228, 248, ${effAlpha * 0.15})`);
             grad.addColorStop(1, 'rgba(195, 220, 245, 0)');
           } else {
             // Foreground wispy clouds above cards
-            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.7})`);
-            grad.addColorStop(0.35, `rgba(255, 252, 245, ${effAlpha * 0.5})`);
-            grad.addColorStop(0.72, `rgba(230, 242, 255, ${effAlpha * 0.2})`);
+            grad.addColorStop(0, `rgba(255, 255, 255, ${effAlpha * 0.70})`);
+            grad.addColorStop(0.30, `rgba(255, 252, 246, ${effAlpha * 0.50})`);
+            grad.addColorStop(0.65, `rgba(232, 244, 255, ${effAlpha * 0.20})`);
             grad.addColorStop(1, 'rgba(215, 235, 255, 0)');
           }
         } else {
           if (!isForeground) {
-            // Background moonlit night clouds
-            grad.addColorStop(0, `rgba(235, 248, 255, ${effAlpha * 0.85})`);
-            grad.addColorStop(0.32, `rgba(185, 218, 252, ${effAlpha * 0.55})`);
-            grad.addColorStop(0.68, `rgba(130, 175, 225, ${effAlpha * 0.25})`);
-            grad.addColorStop(0.9, `rgba(90, 140, 200, ${effAlpha * 0.08})`);
-            grad.addColorStop(1, 'rgba(70, 110, 170, 0)');
+            // Background moonlit night clouds with soft silvery highlights
+            grad.addColorStop(0, `rgba(240, 249, 255, ${effAlpha * 0.82})`);
+            grad.addColorStop(0.28, `rgba(195, 225, 255, ${effAlpha * 0.55})`);
+            grad.addColorStop(0.60, `rgba(138, 182, 230, ${effAlpha * 0.24})`);
+            grad.addColorStop(0.85, `rgba(92, 142, 202, ${effAlpha * 0.08})`);
+            grad.addColorStop(1, 'rgba(65, 105, 165, 0)');
           } else {
-            // Foreground wispy moon clouds above cards
-            grad.addColorStop(0, `rgba(220, 242, 255, ${effAlpha * 0.55})`);
-            grad.addColorStop(0.4, `rgba(165, 210, 250, ${effAlpha * 0.3})`);
-            grad.addColorStop(0.78, `rgba(115, 165, 225, ${effAlpha * 0.1})`);
-            grad.addColorStop(1, 'rgba(80, 130, 190, 0)');
+            // Foreground wispy moon clouds with ethereal transparency
+            grad.addColorStop(0, `rgba(228, 246, 255, ${effAlpha * 0.55})`);
+            grad.addColorStop(0.35, `rgba(175, 218, 252, ${effAlpha * 0.30})`);
+            grad.addColorStop(0.72, `rgba(122, 172, 230, ${effAlpha * 0.10})`);
+            grad.addColorStop(1, 'rgba(75, 125, 185, 0)');
           }
         }
 
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.arc(px, py, outerRadius, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1075,47 +1095,264 @@ class AtmosphereEngine {
   }
 
   // ------------------------------------------
-  // 8. 🌙 MOONLIT MEADOW (Glowing Moon, Clouds & Swaying Breeze Grass)
+  // 8. 🌙 MOONLIT MEADOW (Photorealistic Moon, Floating Breeze Clouds & Swaying Meadow Grass)
   // ------------------------------------------
+  getRealisticMoonCanvas(radius) {
+    const intRadius = Math.round(radius);
+    if (this.cachedMoonCanvas && this.cachedMoonRadius === intRadius) {
+      return this.cachedMoonCanvas;
+    }
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const size = (intRadius * 2 + 8) * dpr;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const mCtx = canvas.getContext('2d');
+    mCtx.scale(dpr, dpr);
+
+    const cx = intRadius + 4;
+    const cy = intRadius + 4;
+    const r = intRadius;
+
+    // 1. Pristine spherical clip
+    mCtx.save();
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    mCtx.clip();
+
+    // 2. Base 3D Spherical Solar Gradient (Top-left sunlit illumination)
+    const baseSphere = mCtx.createRadialGradient(cx - r * 0.24, cy - r * 0.26, r * 0.05, cx, cy, r);
+    baseSphere.addColorStop(0, '#ffffff');        // Pure sunlit highlands
+    baseSphere.addColorStop(0.24, '#f5f9fd');     // Anorthosite plateau
+    baseSphere.addColorStop(0.55, '#dbe7f3');     // Lunar regolith soil
+    baseSphere.addColorStop(0.82, '#bed2e6');     // Mid-tone basalt dust
+    baseSphere.addColorStop(0.96, '#9cb4cc');     // Spherical limb transition
+    baseSphere.addColorStop(1.0, '#849fb8');      // Deep spherical limb
+
+    mCtx.fillStyle = baseSphere;
+    mCtx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+    // Helper: Render soft organic lunar mare basin with feathered gradient
+    const drawMare = (x, y, rx, ry, angle, color) => {
+      mCtx.save();
+      mCtx.translate(cx + x * r, cy + y * r);
+      mCtx.rotate(angle);
+      const mareGrad = mCtx.createRadialGradient(0, 0, 0, 0, 0, Math.max(rx, ry) * r);
+      mareGrad.addColorStop(0, color);
+      mareGrad.addColorStop(0.68, color);
+      mareGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      mCtx.fillStyle = mareGrad;
+      mCtx.beginPath();
+      mCtx.ellipse(0, 0, rx * r, ry * r, 0, 0, Math.PI * 2);
+      mCtx.fill();
+      mCtx.restore();
+    };
+
+    // 3. Authentic Lunar Maria Basalt Geography
+    // Oceanus Procellarum (Ocean of Storms - Vast Northwest Mare Complex)
+    drawMare(-0.35, -0.24, 0.40, 0.50, -0.20, 'rgba(78, 102, 134, 0.52)');
+    drawMare(-0.46, 0.12, 0.32, 0.38, 0.15, 'rgba(74, 98, 128, 0.48)');
+    drawMare(-0.25, -0.46, 0.25, 0.28, 0.30, 'rgba(82, 106, 136, 0.42)');
+
+    // Mare Imbrium (Sea of Rains - Great Circular Northern Basin)
+    drawMare(-0.14, -0.32, 0.32, 0.28, -0.10, 'rgba(68, 92, 124, 0.58)');
+    // Sinus Iridum (Bay of Rainbows on Mare Imbrium rim)
+    drawMare(-0.28, -0.52, 0.14, 0.10, 0.40, 'rgba(88, 114, 144, 0.50)');
+
+    // Mare Serenitatis & Mare Tranquillitatis (Sea of Serenity & Sea of Tranquility)
+    drawMare(0.14, -0.28, 0.24, 0.22, 0.10, 'rgba(64, 88, 120, 0.60)');
+    drawMare(0.28, -0.06, 0.26, 0.24, -0.25, 'rgba(60, 84, 116, 0.62)');
+
+    // Mare Crisium (Crisp Isolated Eastern Oval Sea)
+    drawMare(0.58, -0.16, 0.16, 0.22, 0.15, 'rgba(56, 80, 112, 0.68)');
+
+    // Mare Fecunditatis & Mare Nectaris (Southeast Basalt Plains)
+    drawMare(0.42, 0.18, 0.24, 0.22, 0.20, 'rgba(70, 95, 126, 0.52)');
+    drawMare(0.24, 0.30, 0.16, 0.15, -0.10, 'rgba(72, 98, 128, 0.55)');
+
+    // Mare Nubium & Mare Humorum (Southwest Volcanic Basins)
+    drawMare(-0.18, 0.32, 0.24, 0.22, 0.10, 'rgba(74, 98, 128, 0.54)');
+    drawMare(-0.42, 0.28, 0.15, 0.14, 0.00, 'rgba(78, 102, 132, 0.50)');
+
+    // 4. Crater Relief & Mountain Ranges with 3D Sunward Highlight and Shadow
+    const drawCrater = (x, y, radius, depth = 0.5) => {
+      const px = cx + x * r;
+      const py = cy + y * r;
+      const cr = radius * r;
+
+      // Dark shadow crescent (southeast)
+      mCtx.fillStyle = `rgba(48, 70, 96, ${0.45 * depth})`;
+      mCtx.beginPath();
+      mCtx.arc(px + cr * 0.18, py + cr * 0.18, cr, 0, Math.PI * 2);
+      mCtx.fill();
+
+      // Bright sunlit crescent rim (northwest)
+      mCtx.fillStyle = `rgba(255, 255, 255, ${0.75 * depth})`;
+      mCtx.beginPath();
+      mCtx.arc(px - cr * 0.14, py - cr * 0.14, cr * 0.92, 0, Math.PI * 2);
+      mCtx.fill();
+
+      // Crater floor
+      mCtx.fillStyle = `rgba(155, 180, 208, ${0.35 * depth})`;
+      mCtx.beginPath();
+      mCtx.arc(px, py, cr * 0.75, 0, Math.PI * 2);
+      mCtx.fill();
+    };
+
+    // Famous Crater Landmarks
+    drawCrater(-0.10, -0.56, 0.07, 0.85); // Plato (Dark floor)
+    drawCrater(-0.06, -0.26, 0.05, 0.70); // Archimedes
+    drawCrater(0.28, 0.22, 0.06, 0.75);   // Theophilus
+    drawCrater(0.62, 0.10, 0.06, 0.70);   // Langrenus
+    drawCrater(0.08, 0.72, 0.09, 0.80);   // Clavius
+    drawCrater(-0.68, -0.05, 0.06, 0.75); // Grimaldi
+
+    // 5. Prominent Ray Impact Craters with Radiating Silver Ejecta Rays
+    // TYCHO CRATER (Southern Giant Ray System)
+    const tychoX = cx + 0.14 * r;
+    const tychoY = cy + 0.58 * r;
+    const tychoR = 0.055 * r;
+
+    // 16 Radiating Silver Ejecta Rays
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2 + 0.12;
+      const rayLen = r * (0.45 + (Math.sin(i * 37) * 0.5 + 0.5) * 0.65);
+      const rayWidth = 0.025 + (i % 2 === 0 ? 0.015 : 0.005);
+
+      const rayGrad = mCtx.createLinearGradient(tychoX, tychoY, tychoX + Math.cos(angle) * rayLen, tychoY + Math.sin(angle) * rayLen);
+      rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+      rayGrad.addColorStop(0.35, 'rgba(240, 248, 255, 0.40)');
+      rayGrad.addColorStop(0.75, 'rgba(215, 235, 255, 0.15)');
+      rayGrad.addColorStop(1, 'rgba(200, 225, 255, 0)');
+
+      mCtx.save();
+      mCtx.strokeStyle = rayGrad;
+      mCtx.lineWidth = rayWidth * r;
+      mCtx.lineCap = 'round';
+      mCtx.beginPath();
+      mCtx.moveTo(tychoX, tychoY);
+      mCtx.lineTo(tychoX + Math.cos(angle) * rayLen, tychoY + Math.sin(angle) * rayLen);
+      mCtx.stroke();
+      mCtx.restore();
+    }
+    drawCrater(0.14, 0.58, 0.055, 1.0);
+    mCtx.fillStyle = '#ffffff';
+    mCtx.beginPath();
+    mCtx.arc(tychoX, tychoY, tychoR * 0.45, 0, Math.PI * 2);
+    mCtx.fill();
+
+    // COPERNICUS CRATER (Major Central Ray System)
+    const copX = cx - 0.20 * r;
+    const copY = cy - 0.05 * r;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 + 0.20;
+      const rayLen = r * (0.28 + (i % 3) * 0.12);
+      const rayGrad = mCtx.createLinearGradient(copX, copY, copX + Math.cos(angle) * rayLen, copY + Math.sin(angle) * rayLen);
+      rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.65)');
+      rayGrad.addColorStop(0.50, 'rgba(235, 245, 255, 0.25)');
+      rayGrad.addColorStop(1, 'rgba(200, 225, 255, 0)');
+
+      mCtx.save();
+      mCtx.strokeStyle = rayGrad;
+      mCtx.lineWidth = 0.02 * r;
+      mCtx.beginPath();
+      mCtx.moveTo(copX, copY);
+      mCtx.lineTo(copX + Math.cos(angle) * rayLen, copY + Math.sin(angle) * rayLen);
+      mCtx.stroke();
+      mCtx.restore();
+    }
+    drawCrater(-0.20, -0.05, 0.065, 0.95);
+
+    // KEPLER CRATER
+    drawCrater(-0.40, 0.04, 0.04, 0.90);
+
+    // ARISTARCHUS PLATEAU (Brightest Volcanic Diamond-White Hotspot)
+    mCtx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+    mCtx.beginPath();
+    mCtx.arc(cx - 0.52 * r, cy - 0.22 * r, 0.038 * r, 0, Math.PI * 2);
+    mCtx.fill();
+    const arisHalo = mCtx.createRadialGradient(cx - 0.52 * r, cy - 0.22 * r, 0, cx - 0.52 * r, cy - 0.22 * r, 0.10 * r);
+    arisHalo.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+    arisHalo.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    mCtx.fillStyle = arisHalo;
+    mCtx.beginPath();
+    mCtx.arc(cx - 0.52 * r, cy - 0.22 * r, 0.10 * r, 0, Math.PI * 2);
+    mCtx.fill();
+
+    // 6. Surface Micro-Regolith Craters
+    const microCraters = [
+      { x: 0.35, y: -0.50, r: 0.025 }, { x: 0.45, y: -0.40, r: 0.030 },
+      { x: -0.55, y: -0.40, r: 0.028 }, { x: -0.05, y: 0.65, r: 0.032 },
+      { x: 0.42, y: 0.52, r: 0.035 }, { x: -0.32, y: 0.58, r: 0.028 },
+      { x: 0.05, y: -0.15, r: 0.022 }, { x: -0.02, y: 0.18, r: 0.026 },
+      { x: 0.62, y: -0.42, r: 0.024 }, { x: -0.62, y: 0.42, r: 0.030 }
+    ];
+    for (const mc of microCraters) {
+      drawCrater(mc.x, mc.y, mc.r, 0.60);
+    }
+
+    // 7. Outer Lunar Limb Silver Glint
+    const limbGlow = mCtx.createRadialGradient(cx, cy, r * 0.88, cx, cy, r);
+    limbGlow.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    limbGlow.addColorStop(0.85, 'rgba(255, 255, 255, 0.25)');
+    limbGlow.addColorStop(1.0, 'rgba(255, 255, 255, 0.55)');
+    mCtx.fillStyle = limbGlow;
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    mCtx.fill();
+
+    mCtx.restore();
+
+    this.cachedMoonCanvas = canvas;
+    this.cachedMoonRadius = intRadius;
+    return canvas;
+  }
+
   drawUnderlayMoon(bassEnergy) {
     const time = performance.now();
 
-    // 1. Glowing Moon with Soft Multi-Layer Aura
+    // 1. High-Texture Photorealistic Moon with Multi-Layer Atmospheric Corona
     const moonX = this.width * (this.width < 768 ? 0.82 : 0.78);
-    const moonY = this.height * 0.16;
-    const moonRadius = Math.min(this.width, this.height) * 0.055 + 14;
+    const moonY = this.height * (this.width < 768 ? 0.14 : 0.16);
+    const moonRadius = Math.min(this.width, this.height) * 0.065 + 18;
 
-    // Giant outer ambient lunar glow
-    const outerHalo = this.uCtx.createRadialGradient(moonX, moonY, moonRadius * 0.8, moonX, moonY, moonRadius * 3.8);
-    outerHalo.addColorStop(0, `rgba(180, 225, 255, ${0.28 + bassEnergy * 0.18})`);
-    outerHalo.addColorStop(0.5, `rgba(130, 190, 255, ${0.12 + bassEnergy * 0.08})`);
-    outerHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-    this.uCtx.fillStyle = outerHalo;
+    // Atmospheric Layer 1: Giant Ambient Moonlight Sky Wash
+    const skyWash = this.uCtx.createRadialGradient(moonX, moonY, moonRadius * 0.5, moonX, moonY, moonRadius * 5.8);
+    skyWash.addColorStop(0, 'rgba(135, 195, 255, 0.12)');
+    skyWash.addColorStop(0.50, 'rgba(95, 160, 240, 0.04)');
+    skyWash.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    this.uCtx.fillStyle = skyWash;
     this.uCtx.beginPath();
-    this.uCtx.arc(moonX, moonY, moonRadius * 3.8, 0, Math.PI * 2);
+    this.uCtx.arc(moonX, moonY, moonRadius * 5.8, 0, Math.PI * 2);
     this.uCtx.fill();
 
-    // Moon disc
-    const moonDisc = this.uCtx.createRadialGradient(moonX - moonRadius * 0.3, moonY - moonRadius * 0.3, moonRadius * 0.1, moonX, moonY, moonRadius);
-    moonDisc.addColorStop(0, '#ffffff');
-    moonDisc.addColorStop(0.65, '#e8f4ff');
-    moonDisc.addColorStop(1, '#c5defa');
-
-    this.uCtx.fillStyle = moonDisc;
+    // Atmospheric Layer 2: 22° Ice-Crystal Optical Diffraction Halo
+    const diffractionHalo = this.uCtx.createRadialGradient(moonX, moonY, moonRadius * 1.6, moonX, moonY, moonRadius * 3.4);
+    diffractionHalo.addColorStop(0, 'rgba(180, 225, 255, 0.18)');
+    diffractionHalo.addColorStop(0.45, 'rgba(145, 205, 255, 0.08)');
+    diffractionHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    this.uCtx.fillStyle = diffractionHalo;
     this.uCtx.beginPath();
-    this.uCtx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+    this.uCtx.arc(moonX, moonY, moonRadius * 3.4, 0, Math.PI * 2);
     this.uCtx.fill();
 
-    // Moon crater maria
-    this.uCtx.fillStyle = 'rgba(160, 195, 235, 0.28)';
+    // Atmospheric Layer 3: Inner Radiant Airglow Corona
+    const innerCorona = this.uCtx.createRadialGradient(moonX, moonY, moonRadius * 0.95, moonX, moonY, moonRadius * 1.55);
+    innerCorona.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+    innerCorona.addColorStop(0.35, 'rgba(210, 240, 255, 0.32)');
+    innerCorona.addColorStop(0.70, 'rgba(165, 215, 255, 0.12)');
+    innerCorona.addColorStop(1, 'rgba(120, 180, 255, 0)');
+    this.uCtx.fillStyle = innerCorona;
     this.uCtx.beginPath();
-    this.uCtx.arc(moonX - moonRadius * 0.25, moonY - moonRadius * 0.2, moonRadius * 0.28, 0, Math.PI * 2);
+    this.uCtx.arc(moonX, moonY, moonRadius * 1.55, 0, Math.PI * 2);
     this.uCtx.fill();
 
-    this.uCtx.beginPath();
-    this.uCtx.arc(moonX + moonRadius * 0.2, moonY + moonRadius * 0.25, moonRadius * 0.35, 0, Math.PI * 2);
-    this.uCtx.fill();
+    // High-Resolution Photorealistic Moon Disc
+    const moonCanvas = this.getRealisticMoonCanvas(moonRadius);
+    if (moonCanvas) {
+      this.uCtx.drawImage(moonCanvas, moonX - moonRadius - 4, moonY - moonRadius - 4, moonRadius * 2 + 8, moonRadius * 2 + 8);
+    }
 
     // 2. Distant Night Stars
     for (let i = 0; i < this.bgParticles.length; i++) {
@@ -1131,8 +1368,8 @@ class AtmosphereEngine {
       }
     }
 
-    // 3. Realistic Drifting Volumetric Background Clouds
-    this.drawRealisticClouds(this.uCtx, this.bgClouds, false, bassEnergy, false);
+    // 3. Smooth Floating Background Clouds Drifting on Night Breeze (Zero Blinking)
+    this.drawRealisticClouds(this.uCtx, this.bgClouds, false, false, time);
 
     // 4. Moving Meadow Grass Blades (Influenced by slow soothing breeze)
     this.drawMeadowGrass(this.uCtx, time, bassEnergy, false);
@@ -1142,14 +1379,13 @@ class AtmosphereEngine {
   drawOverlayMoon(bassEnergy) {
     const time = performance.now();
 
-    // 1. Realistic Foreground Ethereal Wispy Clouds (Drifting Above/Across Cards)
-    this.drawRealisticClouds(this.oCtx, this.fgClouds, false, bassEnergy, true);
+    // 1. Smooth Floating Ethereal Wispy Clouds Drifting on Breeze Above Cards
+    this.drawRealisticClouds(this.oCtx, this.fgClouds, false, true, time);
 
     // 2. Foreground Moving Grass Blades with Silvery Moonlight Sheen
     this.drawMeadowGrass(this.oCtx, time, bassEnergy, true);
 
     // 3. Glowing Fireflies / Meadow Light Motes
-
     for (let i = 0; i < this.fgParticles.length; i++) {
       const p = this.fgParticles[i];
       if (p.type === 'firefly') {
@@ -1343,7 +1579,7 @@ class AtmosphereEngine {
     this.uCtx.shadowBlur = 0;
 
     // 2. Realistic Drifting Volumetric Background Clouds
-    this.drawRealisticClouds(this.uCtx, this.bgClouds, true, bassEnergy, false);
+    this.drawRealisticClouds(this.uCtx, this.bgClouds, true, false, time);
 
     // 3. Background Sunlit Emerald Grass Meadow
     this.drawSunnyMeadowGrass(this.uCtx, time, bassEnergy, false);
@@ -1354,7 +1590,7 @@ class AtmosphereEngine {
     const time = performance.now();
 
     // 1. Realistic Foreground Ethereal Wispy Clouds (Drifting Above/Across Cards)
-    this.drawRealisticClouds(this.oCtx, this.fgClouds, true, bassEnergy, true);
+    this.drawRealisticClouds(this.oCtx, this.fgClouds, true, true, time);
 
     // 2. Foreground Sunlit Emerald/Lime Grass Blades
     this.drawSunnyMeadowGrass(this.oCtx, time, bassEnergy, true);
