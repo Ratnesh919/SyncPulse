@@ -544,59 +544,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupModals() {
     // Initial Audio Arm & Device Setup
-    btnArmAudio.addEventListener('click', async () => {
-      const enteredName = deviceNameInput.value.trim();
-      if (enteredName) {
-        myDeviceName = enteredName;
-        localStorage.setItem('syncpulse_device_name', myDeviceName);
-        if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
-      }
+    if (btnArmAudio) {
+      btnArmAudio.addEventListener('click', async () => {
+        const enteredName = deviceNameInput ? deviceNameInput.value.trim() : '';
+        if (enteredName) {
+          myDeviceName = enteredName;
+          localStorage.setItem('syncpulse_device_name', myDeviceName);
+          if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
+        }
 
-      await audioEngine.init();
-      modalArm.classList.remove('active');
-      showToast(`⚡ Audio Activated as "${myDeviceName}"!`);
+        await audioEngine.init();
+        if (modalArm) modalArm.classList.remove('active');
+        showToast(`⚡ Audio Activated as "${myDeviceName}"!`);
 
-      // Update name over WebSocket
-      sendJoinRoomMessage();
+        // Update name over WebSocket
+        sendJoinRoomMessage();
 
-      // If there's an ongoing track or pending playback from host, play immediately!
-      if (currentTrack) {
-        if (currentTrack.type === 'youtube') {
-          if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
-            handleYouTubePlayCue(currentTrack.youtubeVideoId, pendingPlaybackState.position);
-          }
-        } else {
-          await audioEngine.loadTrack(currentTrack.url);
-          if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
-            audioEngine.schedulePlayback(
-              pendingPlaybackState.targetMasterTime,
-              syncEngine ? syncEngine.now() : performance.now(),
-              pendingPlaybackState.position
-            );
-            setPlayButtonState(true);
+        // If there's an ongoing track or pending playback from host, play immediately!
+        if (currentTrack) {
+          if (currentTrack.type === 'youtube') {
+            if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
+              handleYouTubePlayCue(currentTrack.youtubeVideoId, pendingPlaybackState.position);
+            }
+          } else {
+            await audioEngine.loadTrack(currentTrack.url);
+            if (pendingPlaybackState && pendingPlaybackState.isPlaying) {
+              audioEngine.schedulePlayback(
+                pendingPlaybackState.targetMasterTime,
+                syncEngine ? syncEngine.now() : performance.now(),
+                pendingPlaybackState.position
+              );
+              setPlayButtonState(true);
+            }
           }
         }
-      }
-    });
+      });
+    }
 
     // Direct Join Room Modal Trigger
     if (btnOpenJoinModal) {
       btnOpenJoinModal.addEventListener('click', () => {
-        inputRoomPin.value = '';
+        if (inputRoomPin) inputRoomPin.value = '';
         if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
-        modalJoinPicker.classList.add('active');
-        inputRoomPin.focus();
+        if (modalJoinPicker) modalJoinPicker.classList.add('active');
+        if (inputRoomPin) inputRoomPin.focus();
       });
     }
 
     if (btnSubmitJoinRoom) {
       btnSubmitJoinRoom.addEventListener('click', () => {
-        const pin = inputRoomPin.value.trim().toUpperCase();
+        const pin = inputRoomPin ? inputRoomPin.value.trim().toUpperCase() : '';
         if (!pin || pin.length < 3) {
           showToast('⚠️ Please enter a valid room PIN');
           return;
         }
-        const devName = inputJoinDeviceName.value.trim() || myDeviceName;
+        const devName = (inputJoinDeviceName && inputJoinDeviceName.value.trim()) || myDeviceName;
         myDeviceName = devName;
         localStorage.setItem('syncpulse_device_name', myDeviceName);
         window.location.href = `${window.location.pathname}?room=${pin}`;
@@ -605,22 +607,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnCancelJoinRoom) {
       btnCancelJoinRoom.addEventListener('click', () => {
-        modalJoinPicker.classList.remove('active');
+        if (modalJoinPicker) modalJoinPicker.classList.remove('active');
       });
     }
 
     // Rename Device Modal
     if (btnEditDevice) {
       btnEditDevice.addEventListener('click', () => {
-        editNameInput.value = myDeviceName;
-        modalEditName.classList.add('active');
-        editNameInput.focus();
+        if (editNameInput) editNameInput.value = myDeviceName;
+        if (modalEditName) modalEditName.classList.add('active');
+        if (editNameInput) editNameInput.focus();
       });
     }
 
     if (btnSaveDeviceName) {
       btnSaveDeviceName.addEventListener('click', () => {
-        const val = editNameInput.value.trim();
+        const val = editNameInput ? editNameInput.value.trim() : '';
         if (val) {
           myDeviceName = val;
           localStorage.setItem('syncpulse_device_name', myDeviceName);
@@ -628,39 +630,45 @@ document.addEventListener('DOMContentLoaded', () => {
           sendTelemetry();
           showToast(`📱 Device name changed to: ${myDeviceName}`);
         }
-        modalEditName.classList.remove('active');
+        if (modalEditName) modalEditName.classList.remove('active');
       });
     }
 
     if (btnCancelDeviceName) {
       btnCancelDeviceName.addEventListener('click', () => {
-        modalEditName.classList.remove('active');
+        if (modalEditName) modalEditName.classList.remove('active');
       });
     }
 
     // QR Code Share Modal
-    btnShareQr.addEventListener('click', async () => {
-      const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-      qrRoomCode.textContent = currentRoomId;
-      try {
-        const res = await fetch(`/api/qr?url=${encodeURIComponent(roomUrl)}`);
-        const data = await res.json();
-        qrImage.src = data.dataUrl;
-        modalQr.classList.add('active');
-      } catch (err) {
-        showToast('Error generating QR code');
-      }
-    });
-
-    if (btnCloseQr) {
-      btnCloseQr.addEventListener('click', () => modalQr.classList.remove('active'));
+    if (btnShareQr) {
+      btnShareQr.addEventListener('click', async () => {
+        const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+        if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
+        try {
+          const res = await fetch(`/api/qr?url=${encodeURIComponent(roomUrl)}`);
+          const data = await res.json();
+          if (qrImage) qrImage.src = data.dataUrl;
+          if (modalQr) modalQr.classList.add('active');
+        } catch (err) {
+          showToast('Error generating QR code');
+        }
+      });
     }
 
-    btnCopyLink.addEventListener('click', () => {
-      const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-      navigator.clipboard.writeText(roomUrl);
-      showToast('📋 Room link copied to clipboard!');
-    });
+    if (btnCloseQr) {
+      btnCloseQr.addEventListener('click', () => {
+        if (modalQr) modalQr.classList.remove('active');
+      });
+    }
+
+    if (btnCopyLink) {
+      btnCopyLink.addEventListener('click', () => {
+        const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+        navigator.clipboard.writeText(roomUrl);
+        showToast('📋 Room link copied to clipboard!');
+      });
+    }
   }
 
   async function fetchServerInfo() {
@@ -1200,99 +1208,103 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setupControls() {
-    btnPlay.addEventListener('click', async () => {
-      if (myRole === 'guest') {
-        showToast('🔒 Only Host can trigger playback');
-        return;
-      }
+    if (btnPlay) {
+      btnPlay.addEventListener('click', async () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can trigger playback');
+          return;
+        }
 
-      await audioEngine.init();
-      if (!currentTrack) return;
+        await audioEngine.init();
+        if (!currentTrack) return;
 
-      if (currentTrack.type === 'youtube') {
-        const isYtPlaying = ytPlayer && typeof ytPlayer.getPlayerState === 'function' && ytPlayer.getPlayerState() === 1;
-        if (isYtPlaying) {
-          const ytPos = (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0;
-          if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
-          setPlayButtonState(false);
+        if (currentTrack.type === 'youtube') {
+          const isYtPlaying = ytPlayer && typeof ytPlayer.getPlayerState === 'function' && ytPlayer.getPlayerState() === 1;
+          if (isYtPlaying) {
+            const ytPos = (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0;
+            if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+            setPlayButtonState(false);
+            ws.send(JSON.stringify({
+              type: 'pause_cue',
+              position: ytPos,
+              sourceType: 'youtube'
+            }));
+          } else {
+            // Direct user click: immediately start video locally
+            if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+              try {
+                ytPlayer.unMute();
+                ytPlayer.setVolume(100);
+                ytPlayer.playVideo();
+              } catch (e) {}
+              setPlayButtonState(true);
+            } else {
+              handleYouTubeTrackChange(currentTrack.youtubeVideoId, true);
+            }
+
+            const resumePos = (ytPlayer && typeof ytPlayer.getCurrentTime === 'function')
+              ? ytPlayer.getCurrentTime()
+              : (pendingPlaybackState && typeof pendingPlaybackState.position === 'number' ? pendingPlaybackState.position : 0);
+            ws.send(JSON.stringify({
+              type: 'play_cue',
+              sourceType: 'youtube',
+              youtubeVideoId: currentTrack.youtubeVideoId,
+              position: resumePos,
+              leadTime: 80
+            }));
+          }
+          return;
+        }
+
+        if (audioEngine.isPlaying) {
+          const pos = audioEngine.getCurrentPlaybackPosition();
+          audioEngine.pause(pos);
           ws.send(JSON.stringify({
             type: 'pause_cue',
-            position: ytPos,
-            sourceType: 'youtube'
+            position: pos,
+            sourceType: 'audio'
           }));
         } else {
-          // Direct user click: immediately start video locally
-          if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
-            try {
-              ytPlayer.unMute();
-              ytPlayer.setVolume(100);
-              ytPlayer.playVideo();
-            } catch (e) {}
-            setPlayButtonState(true);
-          } else {
-            handleYouTubeTrackChange(currentTrack.youtubeVideoId, true);
+          if (currentTrack.url) {
+            await audioEngine.loadTrack(currentTrack.url);
           }
+          const pos = (audioEngine.pausedPosition !== undefined)
+            ? audioEngine.pausedPosition
+            : ((pendingPlaybackState && typeof pendingPlaybackState.position === 'number') ? pendingPlaybackState.position : (audioEngine.playStartPosition || 0));
 
-          const resumePos = (ytPlayer && typeof ytPlayer.getCurrentTime === 'function')
-            ? ytPlayer.getCurrentTime()
-            : (pendingPlaybackState && typeof pendingPlaybackState.position === 'number' ? pendingPlaybackState.position : 0);
           ws.send(JSON.stringify({
             type: 'play_cue',
-            sourceType: 'youtube',
-            youtubeVideoId: currentTrack.youtubeVideoId,
-            position: resumePos,
-            leadTime: 80
+            trackId: currentTrack.id,
+            position: Math.max(0, pos),
+            sourceType: 'audio',
+            leadTime: 800
           }));
         }
-        return;
-      }
+      });
+    }
 
-      if (audioEngine.isPlaying) {
-        const pos = audioEngine.getCurrentPlaybackPosition();
-        audioEngine.pause(pos);
+    if (btnStop) {
+      btnStop.addEventListener('click', () => {
+        if (myRole === 'guest') {
+          showToast('🔒 Only Host can control playback');
+          return;
+        }
+
+        if (currentTrack && currentTrack.type === 'youtube') {
+          if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        } else {
+          audioEngine.stop();
+          audioEngine.playStartPosition = 0;
+          audioEngine.pausedPosition = 0;
+        }
         ws.send(JSON.stringify({
           type: 'pause_cue',
-          position: pos,
-          sourceType: 'audio'
+          position: 0,
+          sourceType: currentTrack ? currentTrack.type : 'audio'
         }));
-      } else {
-        if (currentTrack.url) {
-          await audioEngine.loadTrack(currentTrack.url);
-        }
-        const pos = (audioEngine.pausedPosition !== undefined)
-          ? audioEngine.pausedPosition
-          : ((pendingPlaybackState && typeof pendingPlaybackState.position === 'number') ? pendingPlaybackState.position : (audioEngine.playStartPosition || 0));
-
-        ws.send(JSON.stringify({
-          type: 'play_cue',
-          trackId: currentTrack.id,
-          position: Math.max(0, pos),
-          sourceType: 'audio',
-          leadTime: 800
-        }));
-      }
-    });
-
-    btnStop.addEventListener('click', () => {
-      if (myRole === 'guest') {
-        showToast('🔒 Only Host can control playback');
-        return;
-      }
-
-      if (currentTrack && currentTrack.type === 'youtube') {
-        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-      } else {
-        audioEngine.stop();
-        audioEngine.playStartPosition = 0;
-        audioEngine.pausedPosition = 0;
-      }
-      ws.send(JSON.stringify({
-        type: 'pause_cue',
-        position: 0,
-        sourceType: currentTrack ? currentTrack.type : 'audio'
-      }));
-      setPlayButtonState(false);
-    });
+        setPlayButtonState(false);
+      });
+    }
 
 
     let isUserScrubbing = false;
@@ -1355,30 +1367,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    progressBar.addEventListener('pointerdown', (e) => {
-      if (myRole === 'guest') return;
-      isUserScrubbing = true;
-      handleScrub(e.clientX);
-    });
-
-    window.addEventListener('pointermove', (e) => {
-      if (isUserScrubbing) {
+    if (progressBar) {
+      progressBar.addEventListener('pointerdown', (e) => {
+        if (myRole === 'guest') return;
+        isUserScrubbing = true;
         handleScrub(e.clientX);
-      }
-    });
+      });
 
-    window.addEventListener('pointerup', (e) => {
-      if (isUserScrubbing) {
-        isUserScrubbing = false;
-        commitScrub(e.clientX);
-      }
-    });
+      window.addEventListener('pointermove', (e) => {
+        if (isUserScrubbing) {
+          handleScrub(e.clientX);
+        }
+      });
 
-    progressBar.addEventListener('click', (e) => {
-      if (!isUserScrubbing) {
-        commitScrub(e.clientX);
-      }
-    });
+      window.addEventListener('pointerup', (e) => {
+        if (isUserScrubbing) {
+          isUserScrubbing = false;
+          commitScrub(e.clientX);
+        }
+      });
+
+      progressBar.addEventListener('click', (e) => {
+        if (!isUserScrubbing) {
+          commitScrub(e.clientX);
+        }
+      });
+    }
 
 
     modeButtons.forEach(btn => {
@@ -1498,17 +1512,19 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    volumeSlider.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      audioEngine.setVolume(val);
-      if (ytPlayer && ytPlayer.setVolume) {
-        ytPlayer.setVolume(val * 100);
-      }
-      if (volPercent) {
-        volPercent.textContent = `${Math.round(val * 100)}%`;
-      }
-      isMuted = val === 0;
-    });
+    if (volumeSlider) {
+      volumeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        audioEngine.setVolume(val);
+        if (ytPlayer && ytPlayer.setVolume) {
+          ytPlayer.setVolume(val * 100);
+        }
+        if (volPercent) {
+          volPercent.textContent = `${Math.round(val * 100)}%`;
+        }
+        isMuted = val === 0;
+      });
+    }
 
     setupCalibrator();
     requestAnimationFrame(updatePlaybackProgress);
@@ -1866,17 +1882,21 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    btnYtSearch.addEventListener('click', (e) => {
-      e.preventDefault();
-      runYouTubeSearch();
-    });
-
-    ytSearchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+    if (btnYtSearch) {
+      btnYtSearch.addEventListener('click', (e) => {
         e.preventDefault();
         runYouTubeSearch();
-      }
-    });
+      });
+    }
+
+    if (ytSearchInput) {
+      ytSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runYouTubeSearch();
+        }
+      });
+    }
 
     fetchYouTubeResults('barsaat darshan raval');
   }
