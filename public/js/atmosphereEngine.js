@@ -11,8 +11,27 @@ class AtmosphereEngine {
   constructor(underlayCanvas, overlayCanvas, audioEngine) {
     this.underlayCanvas = underlayCanvas;
     this.overlayCanvas = overlayCanvas;
-    this.uCtx = this.underlayCanvas ? this.underlayCanvas.getContext('2d') : null;
-    this.oCtx = this.overlayCanvas ? this.overlayCanvas.getContext('2d') : null;
+
+    // Request direct hardware GPU rendering with desynchronized presentation queue
+    const gpuContextOptions = {
+      alpha: true,
+      desynchronized: true,
+      powerPreference: 'high-performance',
+      willReadFrequently: false
+    };
+
+    this.uCtx = this.underlayCanvas ? (this.underlayCanvas.getContext('2d', gpuContextOptions) || this.underlayCanvas.getContext('2d')) : null;
+    this.oCtx = this.overlayCanvas ? (this.overlayCanvas.getContext('2d', gpuContextOptions) || this.overlayCanvas.getContext('2d')) : null;
+    
+    if (this.uCtx) {
+      this.uCtx.imageSmoothingEnabled = true;
+      this.uCtx.imageSmoothingQuality = 'high';
+    }
+    if (this.oCtx) {
+      this.oCtx.imageSmoothingEnabled = true;
+      this.oCtx.imageSmoothingQuality = 'high';
+    }
+
     this.audioEngine = audioEngine;
 
     this.currentTheme = 'stars';
@@ -39,20 +58,24 @@ class AtmosphereEngine {
     this.height = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    if (this.underlayCanvas) {
+    if (this.underlayCanvas && this.uCtx) {
       this.underlayCanvas.width = this.width * dpr;
       this.underlayCanvas.height = this.height * dpr;
       this.underlayCanvas.style.width = `${this.width}px`;
       this.underlayCanvas.style.height = `${this.height}px`;
       this.uCtx.scale(dpr, dpr);
+      this.uCtx.imageSmoothingEnabled = true;
+      this.uCtx.imageSmoothingQuality = 'high';
     }
 
-    if (this.overlayCanvas) {
+    if (this.overlayCanvas && this.oCtx) {
       this.overlayCanvas.width = this.width * dpr;
       this.overlayCanvas.height = this.height * dpr;
       this.overlayCanvas.style.width = `${this.width}px`;
       this.overlayCanvas.style.height = `${this.height}px`;
       this.oCtx.scale(dpr, dpr);
+      this.oCtx.imageSmoothingEnabled = true;
+      this.oCtx.imageSmoothingQuality = 'high';
     }
 
     this.initParticles();

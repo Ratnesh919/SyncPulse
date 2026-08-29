@@ -95,10 +95,13 @@ class Visualizer3D {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: false,
+      antialias: (window.devicePixelRatio || 1) <= 1.5,
       alpha: true,
-      powerPreference: 'default',
-      preserveDrawingBuffer: false
+      powerPreference: 'high-performance',
+      precision: 'highp',
+      preserveDrawingBuffer: false,
+      stencil: false,
+      depth: true
     });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -292,7 +295,17 @@ class Visualizer3D {
   }
 
   initCanvas2D() {
-    this.ctx2d = this.canvas.getContext('2d');
+    const gpuContextOptions = {
+      alpha: true,
+      desynchronized: true,
+      powerPreference: 'high-performance',
+      willReadFrequently: false
+    };
+    this.ctx2d = this.canvas.getContext('2d', gpuContextOptions) || this.canvas.getContext('2d');
+    if (this.ctx2d) {
+      this.ctx2d.imageSmoothingEnabled = true;
+      this.ctx2d.imageSmoothingQuality = 'high';
+    }
     this.handleResize();
   }
 
