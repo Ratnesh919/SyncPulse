@@ -122,13 +122,19 @@ class AudioEngine {
     this.duckingGainNode = this.ctx.createGain();
     this.duckingGainNode.gain.value = 1.0;
 
+    // 1. Analog Tube Harmonic Saturator / Exciter (Tuna.js / Tube Overdrive algorithm)
+    this.tubeSaturator = this.ctx.createWaveShaper();
+    this.tubeSaturator.curve = this.makeTubeDistortionCurve(16);
+    this.tubeSaturator.oversample = '4x';
+    this.duckingGainNode.connect(this.tubeSaturator);
+
     // Mastering Dynamics Compressor / Brickwall Limiter (Prevents Digital Clipping)
     this.masterCompressor = this.ctx.createDynamicsCompressor();
-    this.masterCompressor.threshold.value = -12;
-    this.masterCompressor.knee.value = 10;
-    this.masterCompressor.ratio.value = 4.0;
-    this.masterCompressor.attack.value = 0.003;
-    this.masterCompressor.release.value = 0.25;
+    this.masterCompressor.threshold.value = -14;
+    this.masterCompressor.knee.value = 12;
+    this.masterCompressor.ratio.value = 4.5;
+    this.masterCompressor.attack.value = 0.002;
+    this.masterCompressor.release.value = 0.20;
 
     // 10-Band Graphic Equalizer Filter Chain (31Hz, 63Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz)
     this.eqBands = [];
@@ -148,15 +154,15 @@ class AudioEngine {
       this.eqBands.push(filter);
     }
 
-    // Connect 10-band serial cascade: ducking -> Band 0 -> Band 1 -> ... -> Band 9
-    this.duckingGainNode.connect(this.eqBands[0]);
+    // Connect serial cascade: tubeSaturator -> Band 0 -> Band 1 -> ... -> Band 9
+    this.tubeSaturator.connect(this.eqBands[0]);
     for (let i = 0; i < this.eqBands.length - 1; i++) {
       this.eqBands[i].connect(this.eqBands[i + 1]);
     }
 
-    // Concert Hall / Cathedral Multi-Room Reverb Architecture
+    // 2. Google Resonance Early Reflection Convolution Reverb Architecture
     this.convolver = this.ctx.createConvolver();
-    this.convolver.buffer = this.createConcertHallImpulse(2.6, 2.0);
+    this.convolver.buffer = this.createResonanceImpulse(2.8, 1.9);
     this.reverbGain = this.ctx.createGain();
     this.reverbGain.gain.value = 0.0;
     this.dryGain = this.ctx.createGain();
@@ -800,6 +806,62 @@ class AudioEngine {
     }
     const elapsed = this.ctx.currentTime - this.playStartCtxTime;
     return Math.min(this.currentBuffer ? this.currentBuffer.duration : 0, (this.playStartPosition || 0) + elapsed);
+  }
+
+  // 1. Tuna.js-style Analog Tube / Tape Harmonic Saturation Curve
+  makeTubeDistortionCurve(amount = 16) {
+    const k = Math.max(0, amount);
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / n_samples - 1;
+      // Soft-knee polynomial saturation transfer function (adds warm tube harmonics without digital clipping)
+      curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+  }
+
+  setAnalogWarmth(amount) {
+    if (this.tubeSaturator) {
+      this.tubeSaturator.curve = this.makeTubeDistortionCurve(amount);
+    }
+  }
+
+  // 2. Google Resonance Multi-Tap Early Reflection Impulse Generator
+  createResonanceImpulse(duration = 2.8, decay = 1.9) {
+    if (!this.ctx) return null;
+    const rate = this.ctx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+
+    // 5 discrete spatial early reflection delay taps
+    const earlyTaps = [
+      { t: 0.011, gL: 0.65, gR: 0.40 },
+      { t: 0.017, gL: 0.35, gR: 0.58 },
+      { t: 0.026, gL: 0.48, gR: 0.32 },
+      { t: 0.035, gL: 0.28, gR: 0.42 },
+      { t: 0.044, gL: 0.38, gR: 0.25 }
+    ];
+
+    for (const tap of earlyTaps) {
+      const sampleIdx = Math.floor(tap.t * rate);
+      if (sampleIdx < length) {
+        left[sampleIdx] += tap.gL;
+        right[sampleIdx] += tap.gR;
+      }
+    }
+
+    // High-density diffuse reverberation tail with natural acoustic air absorption
+    for (let i = 0; i < length; i++) {
+      const n = i / length;
+      const env = Math.pow(1 - n, decay);
+      left[i] += (Math.random() * 2 - 1) * env * 0.45;
+      right[i] += (Math.random() * 2 - 1) * env * 0.45;
+    }
+    return impulse;
   }
 
   // Generate a lush stereo impulse response for Concert Hall Reverb

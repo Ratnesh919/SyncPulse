@@ -1713,6 +1713,30 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    const sliderWarmth = document.getElementById('slider-analog-warmth');
+    const valWarmth = document.getElementById('val-analog-warmth');
+    if (sliderWarmth) {
+      sliderWarmth.addEventListener('input', async () => {
+        await audioEngine.init();
+        const v = parseInt(sliderWarmth.value, 10);
+        if (valWarmth) valWarmth.textContent = `${v}%`;
+        audioEngine.setAnalogWarmth(v);
+      });
+    }
+
+    const sliderReflections = document.getElementById('slider-early-reflections');
+    const valReflections = document.getElementById('val-early-reflections');
+    if (sliderReflections) {
+      sliderReflections.addEventListener('input', async () => {
+        await audioEngine.init();
+        const v = parseInt(sliderReflections.value, 10);
+        if (valReflections) valReflections.textContent = `${v}%`;
+        if (audioEngine.reverbGain && audioEngine.ctx) {
+          audioEngine.reverbGain.gain.setTargetAtTime(v / 100 * 0.45, audioEngine.ctx.currentTime, 0.04);
+        }
+      });
+    }
+
     // 360 Spatial Radar Setup
     if (btnToggleRadar && spatialRadarBox) {
       btnToggleRadar.addEventListener('click', () => {

@@ -1164,6 +1164,45 @@ body {
   white-space: nowrap;
 }
 
+.eq-master-enhancers {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.enhancer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.enhancer-lbl {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.enhancer-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--neon-cyan);
+  cursor: pointer;
+}
+
+.enhancer-val {
+  font-size: 0.52rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--neon-cyan);
+  min-width: 24px;
+}
+
 .eq-rack-box.disabled .eq-presets-row,
 .eq-rack-box.disabled .eq-sliders-drawer {
   opacity: 0.4;
