@@ -146,7 +146,62 @@ app.get('/api/youtube/search', (req, res) => {
     });
   }).on('error', (err) => {
     console.error('YouTube Search Request Error:', err);
+    res.json({ results: [] });
   });
+});
+
+const youtubedl = require('yt-dlp-exec');
+const ytStreamUrlCache = new Map();
+const STREAM_URL_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+// API: Direct YouTube Audio Stream Proxy for WebAudio API DSP Engine
+app.get('/api/youtube/stream/:videoId', async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId) return res.status(400).send('Missing videoId');
+
+  try {
+    let cleanUrl = null;
+    const cached = ytStreamUrlCache.get(videoId);
+    if (cached && (Date.now() - cached.timestamp < STREAM_URL_CACHE_TTL)) {
+      cleanUrl = cached.url;
+    } else {
+      const rawUrl = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+        getUrl: true,
+        format: 'bestaudio[ext=m4a]/bestaudio/best',
+        noCheckCertificates: true
+      });
+      cleanUrl = (rawUrl || '').trim();
+      if (cleanUrl.startsWith('http')) {
+        ytStreamUrlCache.set(videoId, { url: cleanUrl, timestamp: Date.now() });
+      }
+    }
+
+    if (!cleanUrl || !cleanUrl.startsWith('http')) {
+      return res.status(502).json({ error: 'Could not extract audio stream URL' });
+    }
+
+    const reqHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+    if (req.headers.range) {
+      reqHeaders['range'] = req.headers.range;
+    }
+
+    https.get(cleanUrl, { headers: reqHeaders }, (streamRes) => {
+      res.status(streamRes.statusCode || 200);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (streamRes.headers['content-type']) res.setHeader('Content-Type', streamRes.headers['content-type']);
+      if (streamRes.headers['content-length']) res.setHeader('Content-Length', streamRes.headers['content-length']);
+      if (streamRes.headers['content-range']) res.setHeader('Content-Range', streamRes.headers['content-range']);
+      streamRes.pipe(res);
+    }).on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    });
+  } catch (err) {
+    console.error('YouTube audio stream error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 function isHostSender(room, ws, msg) {

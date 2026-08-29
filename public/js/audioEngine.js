@@ -47,6 +47,11 @@ class AudioEngine {
     this.currentTrackUrl = null;
     this.bufferCache = new Map();
 
+    // Direct MediaElement Audio Streaming for WebAudio API DSP
+    this.mediaAudioElement = null;
+    this.mediaElementSource = null;
+    this.isStreamPlaying = false;
+
     this.isPlaying = false;
     this.playStartMasterTime = 0;
     this.playStartCtxTime = 0;
@@ -697,7 +702,65 @@ class AudioEngine {
     };
   }
 
+  // Direct HTML5 Media Element WebAudio Pipeline
+  initMediaElement() {
+    if (this.mediaAudioElement && this.mediaElementSource) return;
+    if (!this.ctx) return;
+
+    try {
+      this.mediaAudioElement = new Audio();
+      this.mediaAudioElement.crossOrigin = 'anonymous';
+      this.mediaAudioElement.preload = 'auto';
+
+      this.mediaElementSource = this.ctx.createMediaElementSource(this.mediaAudioElement);
+      // Connect stream directly through 10-band EQ -> Reverb -> Limiter -> 360/8D/Dolby -> Analyser -> Output!
+      this.mediaElementSource.connect(this.duckingGainNode || this.gainNode);
+    } catch (e) {
+      console.warn('MediaElementAudioSource initialization note:', e);
+    }
+  }
+
+  async loadAndPlayStream(streamUrl, startPos = 0, autoplay = true) {
+    if (!this.ctx) await this.init();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+
+    this.stop();
+    this.initMediaElement();
+
+    if (this.mediaAudioElement) {
+      this.mediaAudioElement.src = streamUrl;
+      this.currentTrackUrl = streamUrl;
+      this.applyAudioRouting();
+
+      if (startPos > 0) {
+        this.mediaAudioElement.currentTime = startPos;
+      }
+
+      if (autoplay) {
+        try {
+          await this.mediaAudioElement.play();
+          this.isPlaying = true;
+          this.isStreamPlaying = true;
+        } catch (err) {
+          console.warn('Stream play error:', err);
+        }
+      }
+    }
+  }
+
+  seekStream(posSec) {
+    if (this.mediaAudioElement && typeof posSec === 'number' && !isNaN(posSec)) {
+      this.mediaAudioElement.currentTime = Math.max(0, posSec);
+    }
+  }
+
   pause(pos) {
+    if (this.mediaAudioElement && this.isStreamPlaying) {
+      try {
+        this.mediaAudioElement.pause();
+        if (typeof pos === 'number') this.mediaAudioElement.currentTime = pos;
+      } catch (e) {}
+    }
     if (this.isPlaying) {
       const currentPos = this.getCurrentPlaybackPosition();
       this.pausedPosition = (typeof pos === 'number' && !isNaN(pos)) ? pos : currentPos;
@@ -716,10 +779,19 @@ class AudioEngine {
       } catch (e) {}
       this.currentSource = null;
     }
+    if (this.mediaAudioElement && this.isStreamPlaying) {
+      try {
+        this.mediaAudioElement.pause();
+      } catch (e) {}
+    }
     this.isPlaying = false;
+    this.isStreamPlaying = false;
   }
 
   getCurrentPlaybackPosition() {
+    if (this.mediaAudioElement && this.isStreamPlaying) {
+      return this.mediaAudioElement.currentTime || 0;
+    }
     if (!this.isPlaying || !this.ctx) {
       return (typeof this.pausedPosition === 'number') ? this.pausedPosition : (this.playStartPosition || 0);
     }
