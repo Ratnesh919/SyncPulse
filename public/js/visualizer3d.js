@@ -295,13 +295,7 @@ class Visualizer3D {
   }
 
   initCanvas2D() {
-    const gpuContextOptions = {
-      alpha: true,
-      desynchronized: true,
-      powerPreference: 'high-performance',
-      willReadFrequently: false
-    };
-    this.ctx2d = this.canvas.getContext('2d', gpuContextOptions) || this.canvas.getContext('2d');
+    this.ctx2d = this.canvas.getContext('2d', { alpha: true });
     if (this.ctx2d) {
       this.ctx2d.imageSmoothingEnabled = true;
       this.ctx2d.imageSmoothingQuality = 'high';

@@ -71,11 +71,6 @@ body {
   height: 100vh;
   pointer-events: none;
   z-index: 0;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  will-change: transform;
-  contain: strict;
-  image-rendering: -webkit-optimize-contrast;
 }
 
 #atmosphere-overlay {
@@ -86,22 +81,12 @@ body {
   height: 100vh;
   pointer-events: none;
   z-index: 998;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  will-change: transform;
-  contain: strict;
-  image-rendering: -webkit-optimize-contrast;
 }
 
 /* Global Hardware GPU Acceleration Promotion */
 #visualizer-3d-canvas,
-.visualizer-canvas,
-.visualizer-card {
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  perspective: 1000px;
+.visualizer-canvas {
   will-change: transform;
-  contain: strict;
 }
 
 .control-console,
@@ -109,13 +94,8 @@ body {
 .queue-board-card,
 .lyrics-card,
 .fleet-acoustic-card,
-.radar-interactive-surface,
-.modal-container,
-.toast-container {
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
+.radar-interactive-surface {
   will-change: transform;
-  contain: layout style;
 }
 
 .vu-bar,
@@ -123,10 +103,8 @@ body {
 .radar-sound-node,
 .laser-beam,
 .firework-spark,
-.shooting-star,
-.eq-band-slider {
-  transform: translateZ(0);
-  will-change: transform;
+.shooting-star {
+  will-change: transform, width;
 }
 
 /* Custom Scrollbar */

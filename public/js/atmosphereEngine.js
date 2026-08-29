@@ -12,16 +12,8 @@ class AtmosphereEngine {
     this.underlayCanvas = underlayCanvas;
     this.overlayCanvas = overlayCanvas;
 
-    // Request direct hardware GPU rendering with desynchronized presentation queue
-    const gpuContextOptions = {
-      alpha: true,
-      desynchronized: true,
-      powerPreference: 'high-performance',
-      willReadFrequently: false
-    };
-
-    this.uCtx = this.underlayCanvas ? (this.underlayCanvas.getContext('2d', gpuContextOptions) || this.underlayCanvas.getContext('2d')) : null;
-    this.oCtx = this.overlayCanvas ? (this.overlayCanvas.getContext('2d', gpuContextOptions) || this.overlayCanvas.getContext('2d')) : null;
+    this.uCtx = this.underlayCanvas ? this.underlayCanvas.getContext('2d', { alpha: true }) : null;
+    this.oCtx = this.overlayCanvas ? this.overlayCanvas.getContext('2d', { alpha: true }) : null;
     
     if (this.uCtx) {
       this.uCtx.imageSmoothingEnabled = true;
