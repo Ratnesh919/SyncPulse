@@ -187,6 +187,54 @@ document.addEventListener('DOMContentLoaded', () => {
   // 24/7 Live Radio Stations Elements
   const radioCards = document.querySelectorAll('.radio-card');
 
+  // Safe LocalStorage helpers (prevents Safari Private Browsing/SecurityError exceptions)
+  function safeStorageGet(key, fallback = null) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key) || fallback;
+      }
+    } catch (e) {
+      console.warn('Storage read warning:', e);
+    }
+    return fallback;
+  }
+
+  function safeStorageSet(key, val) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, val);
+      }
+    } catch (e) {
+      console.warn('Storage write warning:', e);
+    }
+  }
+
+  // Centralized Room Display Synchronizer (Header capsule, QR modal, Welcome modal, and browser URL)
+  function updateRoomDisplays(roomId) {
+    if (!roomId) return;
+    currentRoomId = String(roomId).toUpperCase().trim();
+
+    if (roomCodeText) roomCodeText.textContent = currentRoomId;
+    if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
+
+    const armRoomBadge = document.getElementById('arm-room-code-badge');
+    if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
+
+    const qrPreview = document.getElementById('qr-room-url-preview');
+    if (qrPreview) {
+      qrPreview.textContent = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+    }
+
+    // Keep browser address bar in sync so page refresh maintains the exact same room
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('room') !== currentRoomId) {
+        url.searchParams.set('room', currentRoomId);
+        window.history.replaceState({ room: currentRoomId }, '', url.toString());
+      }
+    } catch (e) {}
+  }
+
   // Core Engines
   let ws = null;
   let syncEngine = null;
@@ -198,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRoomId = null;
   let myRole = 'host';
   let myPeerId = null;
-  let myDeviceName = localStorage.getItem('syncpulse_device_name') || detectDeviceName();
+  let myDeviceName = safeStorageGet('syncpulse_device_name') || detectDeviceName();
   let currentTrack = null;
   let tracks = [];
   let currentSpatialMode = 'normal';
@@ -233,28 +281,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deviceNameInput) deviceNameInput.value = myDeviceName;
     if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
 
-    // 2. Parse URL room code and set room IMMEDIATELY so Room PIN is never blank
+    // 2. Parse URL room code or restore persistent host room (prevents room resetting on refresh)
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
 
     if (roomParam) {
       currentRoomId = roomParam.toUpperCase().trim();
       myRole = 'guest';
-      if (joinModalTitle) joinModalTitle.textContent = `Join Audio Room ${currentRoomId}`;
-      if (joinModalDesc) joinModalDesc.textContent = `Syncing with room ${currentRoomId}. Tap below to activate synchronized spatial sound on this device.`;
-      if (btnArmAudio) btnArmAudio.textContent = '⚡ Tap to Join & Sync Audio';
+      safeStorageSet('syncpulse_last_guest_room', currentRoomId);
+      if (joinModalTitle) joinModalTitle.textContent = `Join Room ${currentRoomId}`;
+      if (joinModalDesc) joinModalDesc.textContent = `Connecting to surround soundstage in Room ${currentRoomId}. Tap below to activate synchronized audio on this device.`;
+      if (btnArmAudio) btnArmAudio.textContent = `⚡ Connect to Room ${currentRoomId}`;
+      if (inputRoomPin) inputRoomPin.value = currentRoomId;
     } else {
-      currentRoomId = generateRoomCode();
+      const savedHostRoom = safeStorageGet('syncpulse_host_room_id');
+      currentRoomId = savedHostRoom || generateRoomCode();
+      safeStorageSet('syncpulse_host_room_id', currentRoomId);
       myRole = 'host';
       if (joinModalTitle) joinModalTitle.textContent = 'Host Spatial Audio Room';
       if (joinModalDesc) joinModalDesc.textContent = 'Name your master device and tap below to start high-precision spatial synchronization.';
       if (btnArmAudio) btnArmAudio.textContent = '⚡ Start Master Audio Sync';
     }
 
-    if (roomCodeText) roomCodeText.textContent = currentRoomId;
-    const armRoomBadge = document.getElementById('arm-room-code-badge');
-    if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
-    if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
+    updateRoomDisplays(currentRoomId);
     updateRoleUi();
 
     // 3. Connect WebSocket immediately so we join the room and receive fleet peers
@@ -514,6 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (queueBadge) queueBadge.style.display = 'none';
         } else if (targetTab === 'fleet') {
           if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'request_peer_list' }));
             sendTelemetry();
           }
           if (lastKnownPeers && lastKnownPeers.length > 0) {
@@ -571,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const enteredName = deviceNameInput ? deviceNameInput.value.trim() : '';
         if (enteredName) {
           myDeviceName = enteredName;
-          localStorage.setItem('syncpulse_device_name', myDeviceName);
+          safeStorageSet('syncpulse_device_name', myDeviceName);
           if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
         }
 
@@ -645,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const devName = (inputJoinDeviceName && inputJoinDeviceName.value.trim()) || myDeviceName;
         myDeviceName = devName;
-        localStorage.setItem('syncpulse_device_name', myDeviceName);
+        safeStorageSet('syncpulse_device_name', myDeviceName);
         window.location.href = `${window.location.pathname}?room=${encodeURIComponent(pin)}`;
       });
     }
@@ -673,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const val = editNameInput ? editNameInput.value.trim() : '';
         if (val) {
           myDeviceName = val;
-          localStorage.setItem('syncpulse_device_name', myDeviceName);
+          safeStorageSet('syncpulse_device_name', myDeviceName);
           if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
           sendTelemetry();
           showToast(`📱 Device name changed to: ${myDeviceName}`);
@@ -685,6 +735,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCancelDeviceName) {
       btnCancelDeviceName.addEventListener('click', () => {
         if (modalEditName) modalEditName.classList.remove('active');
+      });
+    }
+
+    // New Room Generation Actions
+    const btnResetNewRoom = document.getElementById('btn-reset-new-room');
+    if (btnResetNewRoom) {
+      btnResetNewRoom.addEventListener('click', () => {
+        if (confirm('Generate a brand new Room PIN? This will disconnect connected devices from the old room.')) {
+          const newCode = generateRoomCode();
+          safeStorageSet('syncpulse_host_room_id', newCode);
+          window.location.href = `${window.location.pathname}?room=${newCode}`;
+        }
+      });
+    }
+
+    const btnSwitchToNewRoom = document.getElementById('btn-switch-to-new-room');
+    if (btnSwitchToNewRoom) {
+      btnSwitchToNewRoom.addEventListener('click', () => {
+        const newCode = generateRoomCode();
+        safeStorageSet('syncpulse_host_room_id', newCode);
+        window.location.href = `${window.location.pathname}?room=${newCode}`;
       });
     }
 
@@ -726,6 +797,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // QR Code Share Modal (Instant UI feedback)
     async function openQrModal() {
+      if (!currentRoomId) {
+        currentRoomId = safeStorageGet('syncpulse_host_room_id') || generateRoomCode();
+      }
+      updateRoomDisplays(currentRoomId);
       const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
       if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
       const urlPreview = document.getElementById('qr-room-url-preview');
@@ -863,13 +938,13 @@ document.addEventListener('DOMContentLoaded', () => {
         myPeerId = msg.peerId;
         myRole = msg.role;
         if (msg.roomId) {
-          currentRoomId = msg.roomId;
-          if (roomCodeText) roomCodeText.textContent = currentRoomId;
-          if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
-          const armRoomBadge = document.getElementById('arm-room-code-badge');
-          if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
+          updateRoomDisplays(msg.roomId);
         }
         updateRoleUi();
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'request_peer_list' }));
+        }
 
         if (!lastKnownPeers || lastKnownPeers.length === 0) {
           renderFleetMatrix([{

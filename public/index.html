@@ -12,7 +12,7 @@
   <link rel="dns-prefetch" href="https://www.youtube.com">
   <link rel="dns-prefetch" href="https://googlevideo.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=2.4">
+  <link rel="stylesheet" href="/css/styles.css?v=2.5">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -921,6 +921,11 @@
         <button id="btn-submit-join-room" class="btn-solid-primary" style="flex:1; padding:10px;">🚀 Join & Sync</button>
         <button id="btn-cancel-join-room" class="btn-glass-secondary">Cancel</button>
       </div>
+      <div style="margin-top:10px; text-align:center;">
+        <button id="btn-switch-to-new-room" class="btn-glass-secondary" style="font-size:0.75rem; padding:6px 12px; width:100%; border:1px dashed var(--border-medium);">
+          ✨ Or Host a Brand New Room
+        </button>
+      </div>
     </div>
   </div>
 
@@ -939,10 +944,10 @@
       </p>
 
       <!-- Current Room PIN Display in Welcome Modal -->
-      <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin:2px 0 6px;">
-        <div class="room-capsule" style="padding:6px 18px; font-size:0.88rem;">
-          <span style="font-weight:600; color:var(--text-tertiary);">ROOM PIN:</span>
-          <strong id="arm-room-code-badge" style="font-size:1.2rem; color:var(--neon-cyan); letter-spacing:2px;">------</strong>
+      <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin:6px 0 10px;">
+        <div class="room-capsule" style="padding:8px 22px; font-size:0.95rem; background:rgba(0,242,254,0.08); border:1px solid rgba(0,242,254,0.4); box-shadow:0 0 16px rgba(0,242,254,0.15);">
+          <span style="font-weight:700; color:var(--text-secondary); letter-spacing:1px;">ROOM PIN:</span>
+          <strong id="arm-room-code-badge" style="font-size:1.35rem; color:var(--neon-cyan); letter-spacing:3px; font-family:var(--font-mono);">------</strong>
         </div>
       </div>
 
@@ -989,17 +994,23 @@
       </div>
 
       <div style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:8px 0;">
-        <div class="room-capsule" id="qr-room-capsule" style="font-size:1rem; padding:8px 20px; cursor:pointer;" title="Click to copy Room PIN">
-          <span style="font-weight:600; color:var(--text-secondary);">ROOM PIN:</span>
-          <strong id="qr-room-code" style="font-size:1.35rem; color:var(--neon-cyan); letter-spacing:2.5px;">------</strong>
-          <span style="font-size:0.85rem; opacity:0.8;">📋</span>
+        <div class="room-capsule" id="qr-room-capsule" style="font-size:1.05rem; padding:8px 22px; cursor:pointer; background:rgba(0,242,254,0.08); border:1px solid rgba(0,242,254,0.4);" title="Click to copy Room PIN">
+          <span style="font-weight:700; color:var(--text-secondary);">ROOM PIN:</span>
+          <strong id="qr-room-code" style="font-size:1.4rem; color:var(--neon-cyan); letter-spacing:3px;">------</strong>
+          <span style="font-size:0.9rem; opacity:0.8;">📋</span>
         </div>
-        <div id="qr-room-url-preview" style="font-size:0.72rem; font-family:var(--font-mono); color:var(--text-tertiary); max-width:280px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+        <div id="qr-room-url-preview" style="font-size:0.75rem; font-family:var(--font-mono); color:var(--text-secondary); max-width:290px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(0,0,0,0.4); padding:4px 10px; border-radius:6px;"></div>
       </div>
 
       <div style="display:flex; gap:8px; justify-content:center;">
         <button id="btn-copy-link" class="btn-solid-primary" style="padding:8px 18px; font-size:0.82rem;">📋 Copy Room Link</button>
         <button id="btn-close-qr" class="btn-glass-secondary">Done</button>
+      </div>
+
+      <div style="margin-top:10px; display:flex; justify-content:center;">
+        <button id="btn-reset-new-room" class="btn-glass-secondary" style="font-size:0.75rem; padding:6px 14px; border:1px dashed var(--border-medium); opacity:0.85;">
+          🔄 Generate New Room PIN
+        </button>
       </div>
     </div>
   </div>
@@ -1011,11 +1022,11 @@
 
 
   <!-- Client Application Scripts -->
-  <script src="/js/atmosphereEngine.js?v=2.4"></script>
-  <script src="/js/syncEngine.js?v=2.4"></script>
-  <script src="/js/audioEngine.js?v=2.4"></script>
-  <script src="/js/latencyCalibrator.js?v=2.4"></script>
-  <script src="/js/app.js?v=2.4"></script>
+  <script src="/js/atmosphereEngine.js?v=2.5"></script>
+  <script src="/js/syncEngine.js?v=2.5"></script>
+  <script src="/js/audioEngine.js?v=2.5"></script>
+  <script src="/js/latencyCalibrator.js?v=2.5"></script>
+  <script src="/js/app.js?v=2.5"></script>
 
 </body>
 </html>

@@ -515,6 +515,20 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        // Request Peer List on Demand (Instant Fleet Matrix sync)
+        case 'request_peer_list': {
+          const room = rooms.get(currentRoomId);
+          if (room) {
+            const peerList = Array.from(room.peers.values());
+            ws.send(JSON.stringify({
+              type: 'peer_list_update',
+              peers: peerList,
+              count: peerList.length
+            }));
+          }
+          break;
+        }
+
         // Host: Assign Channel Remotely
         case 'set_peer_channel': {
           const room = rooms.get(currentRoomId);
