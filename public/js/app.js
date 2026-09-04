@@ -271,10 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomParam = urlParams.get('room');
 
     if (roomParam) {
-      currentRoomId = roomParam.toUpperCase();
+      currentRoomId = roomParam.toUpperCase().trim();
       myRole = 'guest';
       if (joinModalTitle) joinModalTitle.textContent = `Join Audio Room ${currentRoomId}`;
-      if (joinModalDesc) joinModalDesc.textContent = 'Enter your device name and tap below to activate synchronized spatial sound on this device.';
+      if (joinModalDesc) joinModalDesc.textContent = `Syncing with room ${currentRoomId}. Tap below to activate synchronized spatial sound on this device.`;
       if (btnArmAudio) btnArmAudio.textContent = '⚡ Tap to Join & Sync Audio';
     } else {
       currentRoomId = generateRoomCode();
@@ -284,14 +284,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnArmAudio) btnArmAudio.textContent = '⚡ Start Master Audio Sync';
     }
 
-    roomCodeText.textContent = currentRoomId;
+    if (roomCodeText) roomCodeText.textContent = currentRoomId;
+    const armRoomBadge = document.getElementById('arm-room-code-badge');
+    if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
+    if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
     updateRoleUi();
 
     connectWebSocket();
     await fetchServerInfo();
 
     // Show initial join modal to unlock audio context on mobile & confirm device name
-    modalArm.classList.add('active');
+    if (modalArm) modalArm.classList.add('active');
 
   }
 
@@ -581,6 +584,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Switch from Initial Arm Welcome modal to Direct Join Room modal
+    const btnArmSwitchToJoin = document.getElementById('btn-arm-switch-to-join');
+    if (btnArmSwitchToJoin) {
+      btnArmSwitchToJoin.addEventListener('click', () => {
+        if (modalArm) modalArm.classList.remove('active');
+        if (inputRoomPin) inputRoomPin.value = '';
+        if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
+        if (modalJoinPicker) modalJoinPicker.classList.add('active');
+        if (inputRoomPin) inputRoomPin.focus();
+      });
+    }
+
     // Direct Join Room Modal Trigger
     if (btnOpenJoinModal) {
       btnOpenJoinModal.addEventListener('click', () => {
@@ -588,6 +603,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
         if (modalJoinPicker) modalJoinPicker.classList.add('active');
         if (inputRoomPin) inputRoomPin.focus();
+      });
+    }
+
+    if (inputRoomPin) {
+      inputRoomPin.addEventListener('input', () => {
+        inputRoomPin.value = inputRoomPin.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      });
+      inputRoomPin.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && btnSubmitJoinRoom) {
+          btnSubmitJoinRoom.click();
+        }
       });
     }
 
@@ -601,13 +627,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const devName = (inputJoinDeviceName && inputJoinDeviceName.value.trim()) || myDeviceName;
         myDeviceName = devName;
         localStorage.setItem('syncpulse_device_name', myDeviceName);
-        window.location.href = `${window.location.pathname}?room=${pin}`;
+        window.location.href = `${window.location.pathname}?room=${encodeURIComponent(pin)}`;
       });
     }
 
     if (btnCancelJoinRoom) {
       btnCancelJoinRoom.addEventListener('click', () => {
         if (modalJoinPicker) modalJoinPicker.classList.remove('active');
+        if (!audioEngine.ctx && modalArm) {
+          modalArm.classList.add('active');
+        }
       });
     }
 
@@ -640,20 +669,82 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // QR Code Share Modal
-    if (btnShareQr) {
-      btnShareQr.addEventListener('click', async () => {
-        const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-        if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
-        try {
-          const res = await fetch(`/api/qr?url=${encodeURIComponent(roomUrl)}`);
-          const data = await res.json();
-          if (qrImage) qrImage.src = data.dataUrl;
-          if (modalQr) modalQr.classList.add('active');
-        } catch (err) {
-          showToast('Error generating QR code');
+    // Clipboard Copy Helper with Mobile Fallback
+    function copyTextToClipboard(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg);
+        }).catch(() => {
+          fallbackCopyText(text, successMsg);
+        });
+      } else {
+        fallbackCopyText(text, successMsg);
+      }
+    }
+
+    function fallbackCopyText(text, successMsg) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        textArea.setAttribute('readonly', '');
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (ok) {
+          showToast(successMsg);
+        } else {
+          prompt('Copy room link:', text);
         }
+      } catch (e) {
+        prompt('Copy room link:', text);
+      }
+    }
+
+    // QR Code Share Modal (Instant UI feedback)
+    async function openQrModal() {
+      const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
+      if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
+      const urlPreview = document.getElementById('qr-room-url-preview');
+      if (urlPreview) urlPreview.textContent = roomUrl;
+      if (qrImage) {
+        qrImage.style.opacity = '0.3';
+      }
+      if (modalQr) modalQr.classList.add('active');
+
+      try {
+        const res = await fetch(`/api/qr?url=${encodeURIComponent(roomUrl)}`);
+        const data = await res.json();
+        if (qrImage && data.dataUrl) {
+          qrImage.src = data.dataUrl;
+          qrImage.style.opacity = '1';
+        }
+      } catch (err) {
+        console.warn('QR fetch error:', err);
+        showToast('⚠️ Could not generate image, but you can copy the Room PIN!');
+      }
+    }
+
+    if (btnShareQr) {
+      btnShareQr.addEventListener('click', openQrModal);
+    }
+
+    const qrRoomCapsule = document.getElementById('qr-room-capsule');
+    if (qrRoomCapsule) {
+      qrRoomCapsule.addEventListener('click', () => {
+        copyTextToClipboard(currentRoomId, `📋 Room PIN ${currentRoomId} copied!`);
       });
+    }
+
+    const headerRoomCapsule = document.querySelector('.master-header .room-capsule');
+    if (headerRoomCapsule) {
+      headerRoomCapsule.style.cursor = 'pointer';
+      headerRoomCapsule.title = 'Click to view QR code or copy Room PIN';
+      headerRoomCapsule.addEventListener('click', openQrModal);
     }
 
     if (btnCloseQr) {
@@ -665,8 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCopyLink) {
       btnCopyLink.addEventListener('click', () => {
         const roomUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoomId}`;
-        navigator.clipboard.writeText(roomUrl);
-        showToast('📋 Room link copied to clipboard!');
+        copyTextToClipboard(roomUrl, '📋 Room link copied to clipboard!');
       });
     }
   }
@@ -753,6 +843,13 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'room_joined':
         myPeerId = msg.peerId;
         myRole = msg.role;
+        if (msg.roomId) {
+          currentRoomId = msg.roomId;
+          if (roomCodeText) roomCodeText.textContent = currentRoomId;
+          if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
+          const armRoomBadge = document.getElementById('arm-room-code-badge');
+          if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
+        }
         updateRoleUi();
 
         if (msg.spatialMode) {
@@ -2671,12 +2768,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function detectDeviceName() {
     const ua = navigator.userAgent;
-    if (/iPhone/i.test(ua)) return 'iPhone Spatial Node';
-    if (/iPad/i.test(ua)) return 'iPad Audio Console';
-    if (/Android/i.test(ua)) return 'Android Audio Node';
-    if (/Macintosh/i.test(ua)) return 'MacBook Master Desk';
-    if (/Windows/i.test(ua)) return 'Windows Master Host';
-    return 'Spatial Audio Node';
+    const num = Math.floor(100 + Math.random() * 900);
+    if (/iPhone/i.test(ua)) return `iPhone #${num}`;
+    if (/iPad/i.test(ua)) return `iPad #${num}`;
+    if (/Android/i.test(ua)) return `Android Node #${num}`;
+    if (/Macintosh/i.test(ua)) return `MacBook #${num}`;
+    if (/Windows/i.test(ua)) return `Windows Host #${num}`;
+    return `Audio Node #${num}`;
   }
 
   function formatTime(sec) {

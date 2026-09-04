@@ -77,15 +77,16 @@ app.get('/api/server-info', (req, res) => {
   });
 });
 
-// API: QR Code Generator
+// API: QR Code Generator (High-contrast for universal phone camera scanning)
 app.get('/api/qr', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).send('Missing url parameter');
   try {
     const qrDataUrl = await qrcode.toDataURL(url, {
-      margin: 1,
-      width: 280,
-      color: { dark: '#00f2fe', light: '#030509' }
+      margin: 2,
+      width: 360,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0a0e1a', light: '#ffffff' }
     });
     res.json({ dataUrl: qrDataUrl });
   } catch (err) {
@@ -275,15 +276,6 @@ wss.on('connection', (ws) => {
           }
 
 
-          // Evict stale connections from same device (by deviceName) to prevent ghost peers
-          if (deviceName) {
-            for (const [existingWs, existingPeer] of room.peers.entries()) {
-              if (existingWs !== ws && existingPeer.deviceName === deviceName) {
-                try { existingWs.terminate(); } catch (e) {}
-                room.peers.delete(existingWs);
-              }
-            }
-          }
 
           const peerInfo = {
             id: peerId,

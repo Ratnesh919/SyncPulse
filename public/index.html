@@ -12,7 +12,7 @@
   <link rel="dns-prefetch" href="https://www.youtube.com">
   <link rel="dns-prefetch" href="https://googlevideo.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=2.2">
+  <link rel="stylesheet" href="/css/styles.css?v=2.3">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -938,13 +938,27 @@
         Enter a name for your device and tap below to activate synchronized spatial audio playback.
       </p>
 
+      <!-- Current Room PIN Display in Welcome Modal -->
+      <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin:2px 0 6px;">
+        <div class="room-capsule" style="padding:6px 18px; font-size:0.88rem;">
+          <span style="font-weight:600; color:var(--text-tertiary);">ROOM PIN:</span>
+          <strong id="arm-room-code-badge" style="font-size:1.2rem; color:var(--neon-cyan); letter-spacing:2px;">------</strong>
+        </div>
+      </div>
+
       <!-- Device Name Setup -->
       <div style="display:flex; flex-direction:column; gap:6px; text-align:left;">
         <label for="device-name-input" style="font-size:0.72rem; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px;">Your Device Name</label>
-        <input type="text" id="device-name-input" class="modal-input" placeholder="e.g. Ratnesh's Phone, Living Room Speaker" maxlength="30">
+        <input type="text" id="device-name-input" class="modal-input" placeholder="e.g. Living Room Speaker, My Phone" maxlength="30">
       </div>
 
       <button id="btn-arm-audio" class="btn-solid-primary" style="padding:12px; font-size:0.95rem; width:100%;">⚡ Tap to Join & Sync Audio</button>
+
+      <div style="display:flex; gap:8px; justify-content:center; margin-top:8px;">
+        <button id="btn-arm-switch-to-join" class="btn-glass-secondary" style="font-size:0.75rem; padding:7px 14px; width:100%;">
+          🔑 Want to enter another room PIN?
+        </button>
+      </div>
     </div>
   </div>
 
@@ -967,18 +981,24 @@
   <div id="modal-qr" class="modal-backdrop">
     <div class="modal-container">
       <div style="font-family:var(--font-display); font-size:1.25rem; font-weight:700; color:#fff;">Connect Additional Phones</div>
-      <p style="font-size:0.8rem; color:var(--text-secondary);">Scan with your phone's camera to join this audio room.</p>
-      <div style="display:flex; justify-content:center; padding:12px; background:#030509; border-radius:10px; border:1px solid var(--border-medium);">
-        <img id="qr-image" alt="QR Code" style="max-width:180px; width:100%; border-radius:6px;">
+      <p style="font-size:0.8rem; color:var(--text-secondary);">Scan with any phone camera or browser to instantly join this room.</p>
+      
+      <!-- High-Contrast Pure White Card for Instant Camera Detection -->
+      <div style="display:flex; justify-content:center; align-items:center; padding:16px; background:#ffffff; border-radius:14px; box-shadow:0 0 30px rgba(0,242,254,0.3); margin:10px auto; max-width:230px;">
+        <img id="qr-image" alt="QR Code" style="width:196px; height:196px; display:block; object-fit:contain; image-rendering:pixelated;">
       </div>
-      <div style="display:flex; justify-content:center;">
-        <div class="room-capsule" style="font-size:0.95rem; padding:6px 16px;">
-          <span>ROOM PIN:</span>
-          <strong id="qr-room-code" style="font-size:1.2rem;">------</strong>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:8px 0;">
+        <div class="room-capsule" id="qr-room-capsule" style="font-size:1rem; padding:8px 20px; cursor:pointer;" title="Click to copy Room PIN">
+          <span style="font-weight:600; color:var(--text-secondary);">ROOM PIN:</span>
+          <strong id="qr-room-code" style="font-size:1.35rem; color:var(--neon-cyan); letter-spacing:2.5px;">------</strong>
+          <span style="font-size:0.85rem; opacity:0.8;">📋</span>
         </div>
+        <div id="qr-room-url-preview" style="font-size:0.72rem; font-family:var(--font-mono); color:var(--text-tertiary); max-width:280px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
       </div>
+
       <div style="display:flex; gap:8px; justify-content:center;">
-        <button id="btn-copy-link" class="btn-solid-primary" style="padding:8px 16px; font-size:0.8rem;">📋 Copy Link</button>
+        <button id="btn-copy-link" class="btn-solid-primary" style="padding:8px 18px; font-size:0.82rem;">📋 Copy Room Link</button>
         <button id="btn-close-qr" class="btn-glass-secondary">Done</button>
       </div>
     </div>
@@ -991,11 +1011,11 @@
 
 
   <!-- Client Application Scripts -->
-  <script src="/js/atmosphereEngine.js?v=2.2"></script>
-  <script src="/js/syncEngine.js?v=2.2"></script>
-  <script src="/js/audioEngine.js?v=2.2"></script>
-  <script src="/js/latencyCalibrator.js?v=2.2"></script>
-  <script src="/js/app.js?v=2.2"></script>
+  <script src="/js/atmosphereEngine.js?v=2.3"></script>
+  <script src="/js/syncEngine.js?v=2.3"></script>
+  <script src="/js/audioEngine.js?v=2.3"></script>
+  <script src="/js/latencyCalibrator.js?v=2.3"></script>
+  <script src="/js/app.js?v=2.3"></script>
 
 </body>
 </html>
