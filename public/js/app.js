@@ -228,45 +228,12 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
 
   async function init() {
+    // 1. Initial Device Name
     if (myDeviceLabel) myDeviceLabel.textContent = myDeviceName;
     if (deviceNameInput) deviceNameInput.value = myDeviceName;
     if (inputJoinDeviceName) inputJoinDeviceName.value = myDeviceName;
 
-    setupAtmosphere();
-    setupTabNavigation();
-    setupModals();
-    setupControls();
-    setupYouTubeDesk();
-    setupLiveChat();
-    setupDjMic();
-    setupEqualizerControls();
-    setupCrossfadeControls();
-    setupRadioStations();
-    setupJukeboxQueue();
-    setupAutoPlayControls();
-
-    if (audioEngine) {
-      audioEngine.onTrackEnded = () => {
-        setPlayButtonState(false);
-        isCrossfading = false;
-        if (myRole === 'host') {
-          if (currentQueue && currentQueue.length > 0) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({
-                type: 'queue_pop_next',
-                crossfadeSec: crossfadeDuration,
-                isAutoTransition: true
-              }));
-            }
-          } else if (isAutoPlayActive) {
-            playSmartAutoRecommendedTrack(currentTrack);
-          }
-        }
-      };
-    }
-
-    
-    // Parse URL room code
+    // 2. Parse URL room code and set room IMMEDIATELY so Room PIN is never blank
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
 
@@ -290,12 +257,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qrRoomCode) qrRoomCode.textContent = currentRoomId;
     updateRoleUi();
 
+    // 3. Connect WebSocket immediately so we join the room and receive fleet peers
     connectWebSocket();
+
+    // 4. Run UI setups safely in try/catch so any widget error never halts core room sync
+    try { setupAtmosphere(); } catch (e) { console.warn('Atmosphere setup error:', e); }
+    try { setupTabNavigation(); } catch (e) { console.warn('Tab navigation setup error:', e); }
+    try { setupModals(); } catch (e) { console.warn('Modals setup error:', e); }
+    try { setupControls(); } catch (e) { console.warn('Controls setup error:', e); }
+    try { setupYouTubeDesk(); } catch (e) { console.warn('YouTube desk setup error:', e); }
+    try { setupLiveChat(); } catch (e) { console.warn('Live chat setup error:', e); }
+    try { setupDjMic(); } catch (e) { console.warn('DJ mic setup error:', e); }
+    try { setupEqualizerControls(); } catch (e) { console.warn('Equalizer setup error:', e); }
+    try { setupCrossfadeControls(); } catch (e) { console.warn('Crossfade setup error:', e); }
+    try { setupRadioStations(); } catch (e) { console.warn('Radio setup error:', e); }
+    try { setupJukeboxQueue(); } catch (e) { console.warn('Jukebox queue setup error:', e); }
+    try { setupAutoPlayControls(); } catch (e) { console.warn('AutoPlay setup error:', e); }
+
+    if (audioEngine) {
+      audioEngine.onTrackEnded = () => {
+        setPlayButtonState(false);
+        isCrossfading = false;
+        if (myRole === 'host') {
+          if (currentQueue && currentQueue.length > 0) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'queue_pop_next',
+                crossfadeSec: crossfadeDuration,
+                isAutoTransition: true
+              }));
+            }
+          } else if (isAutoPlayActive) {
+            playSmartAutoRecommendedTrack(currentTrack);
+          }
+        }
+      };
+    }
+
     await fetchServerInfo();
 
     // Show initial join modal to unlock audio context on mobile & confirm device name
     if (modalArm) modalArm.classList.add('active');
-
   }
 
   let hostSyncHeartbeatTimer = null;
@@ -510,6 +512,23 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         } else if (targetTab === 'jukebox') {
           if (queueBadge) queueBadge.style.display = 'none';
+        } else if (targetTab === 'fleet') {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            sendTelemetry();
+          }
+          if (lastKnownPeers && lastKnownPeers.length > 0) {
+            renderFleetMatrix(lastKnownPeers);
+          } else {
+            renderFleetMatrix([{
+              id: myPeerId || 'self',
+              deviceName: myDeviceName,
+              role: myRole,
+              channel: audioEngine ? audioEngine.channelMode : 'all',
+              rtt: syncEngine ? syncEngine.roundTripTime : 0,
+              jitter: syncEngine ? syncEngine.jitter : 0,
+              hardwareDelay: audioEngine ? audioEngine.hardwareLatencyOffsetMs : 0
+            }]);
+          }
         }
       });
     });
@@ -851,6 +870,18 @@ document.addEventListener('DOMContentLoaded', () => {
           if (armRoomBadge) armRoomBadge.textContent = currentRoomId;
         }
         updateRoleUi();
+
+        if (!lastKnownPeers || lastKnownPeers.length === 0) {
+          renderFleetMatrix([{
+            id: myPeerId,
+            deviceName: myDeviceName,
+            role: myRole,
+            channel: audioEngine ? audioEngine.channelMode : 'all',
+            rtt: syncEngine ? syncEngine.roundTripTime : 0,
+            jitter: syncEngine ? syncEngine.jitter : 0,
+            hardwareDelay: audioEngine ? audioEngine.hardwareLatencyOffsetMs : 0
+          }]);
+        }
 
         if (msg.spatialMode) {
           setSpatialModeUi(msg.spatialMode);
@@ -1729,11 +1760,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Hold-to-Talk (Mouse / Touch)
-    btnDjMic.addEventListener('mousedown', startDjTalking);
+    if (btnDjMic) {
+      btnDjMic.addEventListener('mousedown', startDjTalking);
+      btnDjMic.addEventListener('touchstart', (e) => { startDjTalking(e); }, { passive: false });
+      btnDjMic.addEventListener('touchend', (e) => { stopDjTalking(e); }, { passive: false });
+    }
     window.addEventListener('mouseup', () => { if (isDjTalking) stopDjTalking(); });
-
-    btnDjMic.addEventListener('touchstart', (e) => { startDjTalking(e); }, { passive: false });
-    btnDjMic.addEventListener('touchend', (e) => { stopDjTalking(e); }, { passive: false });
   }
 
   function syncSlidersWithEngine() {
@@ -2359,37 +2391,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     calibrator.onOffsetChange((ms) => {
-      offsetSlider.value = ms;
-      offsetValDisplay.textContent = `${ms > 0 ? '+' : ''}${Math.round(ms)} ms`;
+      if (offsetSlider) offsetSlider.value = ms;
+      if (offsetValDisplay) offsetValDisplay.textContent = `${ms > 0 ? '+' : ''}${Math.round(ms)} ms`;
       sendTelemetry();
     });
 
-    offsetSlider.addEventListener('input', (e) => {
-      const ms = parseFloat(e.target.value);
-      calibrator.setOffset(ms);
-    });
+    if (offsetSlider) {
+      offsetSlider.addEventListener('input', (e) => {
+        const ms = parseFloat(e.target.value);
+        calibrator.setOffset(ms);
+      });
+      offsetSlider.value = calibrator.offsetMs;
+    }
 
-    btnCalibratorToggle.addEventListener('click', async () => {
-      await audioEngine.init();
-      if (calibrator.isActive) {
-        calibrator.stop();
-        btnCalibratorToggle.textContent = '▶ Start Metronome Test';
-        btnCalibratorToggle.classList.remove('btn-solid-primary');
-        btnCalibratorToggle.classList.add('btn-glass-secondary');
-      } else {
-        calibrator.start();
-        btnCalibratorToggle.textContent = '⏹ Stop Metronome Test';
-        btnCalibratorToggle.classList.add('btn-solid-primary');
-        btnCalibratorToggle.classList.remove('btn-glass-secondary');
-      }
-    });
+    if (btnCalibratorToggle) {
+      btnCalibratorToggle.addEventListener('click', async () => {
+        await audioEngine.init();
+        if (calibrator.isActive) {
+          calibrator.stop();
+          btnCalibratorToggle.textContent = '▶ Start Metronome Test';
+          btnCalibratorToggle.classList.remove('btn-solid-primary');
+          btnCalibratorToggle.classList.add('btn-glass-secondary');
+        } else {
+          calibrator.start();
+          btnCalibratorToggle.textContent = '⏹ Stop Metronome Test';
+          btnCalibratorToggle.classList.add('btn-solid-primary');
+          btnCalibratorToggle.classList.remove('btn-glass-secondary');
+        }
+      });
+    }
 
-    btnStepDown.addEventListener('click', () => calibrator.setOffset(calibrator.offsetMs - 5));
-    btnStepUp.addEventListener('click', () => calibrator.setOffset(calibrator.offsetMs + 5));
-    btnResetOffset.addEventListener('click', () => calibrator.setOffset(0));
-
-    offsetSlider.value = calibrator.offsetMs;
-    offsetValDisplay.textContent = `${calibrator.offsetMs > 0 ? '+' : ''}${Math.round(calibrator.offsetMs)} ms`;
+    if (btnStepDown) btnStepDown.addEventListener('click', () => calibrator.setOffset(calibrator.offsetMs - 5));
+    if (btnStepUp) btnStepUp.addEventListener('click', () => calibrator.setOffset(calibrator.offsetMs + 5));
+    if (btnResetOffset) btnResetOffset.addEventListener('click', () => calibrator.setOffset(0));
+    if (offsetValDisplay) offsetValDisplay.textContent = `${calibrator.offsetMs > 0 ? '+' : ''}${Math.round(calibrator.offsetMs)} ms`;
 
     // Wire Continuous Latency Auto-Corrector Listener (Checks & Fixes every 2s)
     audioEngine.onAutoSyncStatus((status) => {
@@ -2630,17 +2665,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function renderFleetMatrix(peers) {
-    fleetGrid.innerHTML = '';
-    deviceCountBadge.textContent = `${peers.length} Online`;
+  let lastKnownPeers = [];
 
-    peers.forEach(peer => {
+  function renderFleetMatrix(peers) {
+    if (!fleetGrid) return;
+    const peerList = Array.isArray(peers) ? peers : [];
+    lastKnownPeers = peerList;
+
+    if (deviceCountBadge) {
+      deviceCountBadge.textContent = `${peerList.length} Online`;
+    }
+
+    fleetGrid.innerHTML = '';
+
+    if (peerList.length === 0) {
+      fleetGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; padding: 36px 20px; text-align:center; background:var(--bg-card); border:1px dashed var(--border-medium); border-radius:14px;">
+          <div style="font-size:2.2rem; margin-bottom:10px;">📱</div>
+          <div style="font-weight:700; font-size:1.1rem; color:#fff; margin-bottom:6px;">Waiting for Connected Devices</div>
+          <p style="font-size:0.85rem; color:var(--text-secondary); max-width:420px; margin:0 auto 16px; line-height:1.5;">
+            Connect another phone, tablet, or laptop to turn them into synchronized surround sound speakers. Scan the QR code or join with Room PIN:
+            <strong style="color:var(--neon-cyan); font-family:var(--font-mono); font-size:1.05rem; letter-spacing:2px; display:block; margin-top:4px;">${currentRoomId || '------'}</strong>
+          </p>
+          <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="padding:9px 22px; font-size:0.85rem; margin:0 auto; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+            <span>📷</span> Connect Phone via QR Code
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    peerList.forEach(peer => {
       const isMe = peer.id === myPeerId;
       const card = document.createElement('div');
       card.className = `node-card ${isMe ? 'self-node' : ''}`;
       card.style.cssText = 'background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px;';
 
-      const pingStatusClass = peer.rtt < 30 ? 'color:var(--neon-emerald)' : (peer.rtt < 100 ? 'color:var(--neon-amber)' : 'color:var(--neon-red)');
+      const pingStatusClass = (peer.rtt || 0) < 30 ? 'color:var(--neon-emerald)' : ((peer.rtt || 0) < 100 ? 'color:var(--neon-amber)' : 'color:var(--neon-red)');
       const chInfo = CHANNEL_MAP[peer.channel] || { name: (peer.channel || 'all').toUpperCase(), icon: '🎚', color: 'var(--neon-cyan)', badge: 'rgba(0,242,254,0.15)', desc: 'Standard channel' };
 
       card.innerHTML = `
@@ -2650,8 +2711,8 @@ document.addEventListener('DOMContentLoaded', () => {
               ${chInfo.icon}
             </div>
             <div>
-              <div style="font-weight:700; font-size:0.88rem; color:#fff;">${peer.deviceName} ${isMe ? '<span style="color:var(--neon-cyan); font-size:0.7rem;">(You)</span>' : ''}</div>
-              <div style="font-size:0.68rem; color:var(--text-tertiary);">${peer.role.toUpperCase()} • ${chInfo.desc}</div>
+              <div style="font-weight:700; font-size:0.88rem; color:#fff;">${peer.deviceName || 'Speaker Node'} ${isMe ? '<span style="color:var(--neon-cyan); font-size:0.7rem;">(You)</span>' : ''}</div>
+              <div style="font-size:0.68rem; color:var(--text-tertiary);">${(peer.role || 'node').toUpperCase()} • ${chInfo.desc}</div>
             </div>
           </div>
           <span style="font-size:0.68rem; font-weight:700; padding:3px 9px; border-radius:999px; background:${chInfo.badge}; color:${chInfo.color}; border:1px solid ${chInfo.color}; display:inline-flex; align-items:center; gap:4px;">
@@ -2662,7 +2723,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; padding:8px 10px; background:rgba(0,0,0,0.35); border-radius:6px;">
           <div style="display:flex; flex-direction:column;">
             <span style="font-size:0.62rem; color:var(--text-tertiary);">PING</span>
-            <span style="font-family:var(--font-mono); font-size:0.82rem; font-weight:700; ${pingStatusClass};">${Math.round(peer.rtt)} ms</span>
+            <span style="font-family:var(--font-mono); font-size:0.82rem; font-weight:700; ${pingStatusClass};">${Math.round(peer.rtt || 0)} ms</span>
           </div>
           <div style="display:flex; flex-direction:column;">
             <span style="font-size:0.62rem; color:var(--text-tertiary);">JITTER</span>
@@ -2702,6 +2763,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       fleetGrid.appendChild(card);
     });
+
+    if (peerList.length <= 1) {
+      const inviteCard = document.createElement('div');
+      inviteCard.style.cssText = 'grid-column: 1 / -1; padding: 18px 20px; text-align:center; background:rgba(0,242,254,0.03); border:1px dashed rgba(0,242,254,0.25); border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:8px;';
+      inviteCard.innerHTML = `
+        <div style="font-size:0.85rem; color:#fff; font-weight:600;">📱 Want Surround Sound? Connect Additional Phones</div>
+        <p style="font-size:0.75rem; color:var(--text-secondary); max-width:480px; margin:0;">
+          Scan the QR code or visit this page on other devices using Room PIN:
+          <strong style="color:var(--neon-cyan); font-family:var(--font-mono); letter-spacing:1px;">${currentRoomId || '------'}</strong>
+        </p>
+        <button onclick="document.getElementById('btn-share-qr').click()" class="btn-solid-primary" style="padding:6px 16px; font-size:0.78rem; margin-top:4px; cursor:pointer;">
+          📷 Show QR Code to Connect
+        </button>
+      `;
+      fleetGrid.appendChild(inviteCard);
+    }
 
     document.querySelectorAll('.remote-channel-select').forEach(sel => {
       sel.addEventListener('change', (e) => {
